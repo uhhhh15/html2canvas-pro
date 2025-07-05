@@ -1,0 +1,61 @@
+<!-- public/extensions/third-party/sillytavern-screenshot-h2c-pro/settings.html -->
+<div>
+  <h2>SillyTavern截图 (h2c-pro)</h2>
+
+  <div class="option-group">
+    <h3>截图操作</h3>
+    <button id="st_h2c_captureLastMsgBtn">截取最后一条消息</button>
+  </div>
+
+  <hr>
+
+  <div class="option-group">
+    <h3>扩展设置</h3>
+    <div class="option">
+      <label for="st_h2c_screenshotDelay">截图前延迟 (ms):</label>
+      <input type="number" id="st_h2c_screenshotDelay" min="0" max="2000" step="50">
+    </div>
+    <div class="option">
+      <label for="st_h2c_scrollDelay">UI更新等待 (ms):</label>
+      <input type="number" id="st_h2c_scrollDelay" min="0" max="2000" step="50">
+    </div>
+    <div class="option">
+      <label for="st_h2c_imageFormat">图片格式:</label>
+      <select id="st_h2c_imageFormat">
+        <option value="jpg">JPG (更小体积)</option>
+        <option value="png">PNG (无损质量)</option>
+      </select>
+    </div>
+
+    <hr>
+
+    <h3>速度/质量设置 (html2canvas-pro)</h3>
+    <div class="option">
+        <label for="st_h2c_screenshotScale">渲染比例 (Scale):</label>
+        <input type="number" id="st_h2c_screenshotScale" min="0.5" max="4.0" step="0.1">
+    </div>
+     <div class="option">
+        <label for="st_h2c_useForeignObjectRendering">尝试快速模式 (兼容性低):</label>
+        <input type="checkbox" id="st_h2c_useForeignObjectRendering">
+    </div>
+    <div class="option">
+        <label for="st_h2c_autoInstallButtons">自动安装消息按钮:</label>
+        <input type="checkbox" id="st_h2c_autoInstallButtons">
+    </div>
+    <div class="option">
+        <label for="st_h2c_altButtonLocation">按钮备用位置:</label>
+        <input type="checkbox" id="st_h2c_altButtonLocation">
+      <label>
+        <input type="checkbox" id="st_h2c_debugOverlay"/>显示调试覆盖层（debugOverlay）
+      </label>
+    </div>
+
+
+    <button id="st_h2c_saveSettingsBtn">保存设置</button>
+    <div class="status-area save-status" id="st_h2c_saveStatus"></div>
+  </div>
+
+  <div class="footer">
+    ST截图工具 v6.0-h2c-pro
+  </div>
+</div>
