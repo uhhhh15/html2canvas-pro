@@ -1527,6 +1527,7 @@ function updateOverlay(overlay, message, progressRatio) {
 function showSettingsPopup() {
     const settings = getPluginSettings();
     
+    // 创建遮罩层
     const overlay = document.createElement('div');
     overlay.className = 'st-settings-overlay';
     Object.assign(overlay.style, {
@@ -1539,11 +1540,10 @@ function showSettingsPopup() {
         zIndex: '10000',
         display: 'flex',
         justifyContent: 'center',
-        alignItems: 'flex-start',
-        paddingTop: '0', // 不需要额外的顶部内边距
-        overflowY: 'auto' // 添加滚动功能以确保在小屏幕上可以访问所有内容
+        alignItems: 'center' // 使用居中对齐
     });
 
+    // 创建弹窗容器
     const popup = document.createElement('div');
     popup.className = 'st-settings-popup';
     Object.assign(popup.style, {
@@ -1551,15 +1551,13 @@ function showSettingsPopup() {
         padding: '20px',
         borderRadius: '10px',
         maxWidth: '400px',
-        width: '100%',
+        width: '90%', // 使用百分比宽度更适合移动设备
         maxHeight: '80vh',
         overflowY: 'auto',
-        marginTop: '80px', // 改为固定的 80px 而不是 25vh
-        position: 'relative', // 添加相对定位
-        top: '0' // 确保从顶部开始
+        margin: '10px' // 添加边距，确保不会紧贴屏幕边缘
     });
 
-    
+    // 标题
     const title = document.createElement('h3');
     title.textContent = '截图设置';
     title.style.marginTop = '0';
@@ -1584,6 +1582,7 @@ function showSettingsPopup() {
         },
     ];
     
+    // 创建设置项
     settingsConfig.forEach(setting => {
         const settingContainer = document.createElement('div');
         settingContainer.style.margin = '10px 0';
@@ -1629,11 +1628,13 @@ function showSettingsPopup() {
         popup.appendChild(settingContainer);
     });
     
+    // 按钮容器
     const buttonContainer = document.createElement('div');
     buttonContainer.style.display = 'flex';
     buttonContainer.style.justifyContent = 'center';
     buttonContainer.style.marginTop = '20px';
     
+    // 保存按钮
     const saveButton = document.createElement('button');
     saveButton.textContent = '保存设置';
     saveButton.style.padding = '8px 16px';
@@ -1663,10 +1664,12 @@ function showSettingsPopup() {
         saveSettingsDebounced();
         loadConfig();
         
-        // 使用toastr显示成功消息
-        toastr.success('设置已保存！');
+        // 使用toastr显示成功消息（如果存在）
+        if (window.toastr) {
+            toastr.success('设置已保存！');
+        }
         
-        // 立即关闭UI面板
+        // 关闭UI面板
         if (overlay.parentElement) {
             document.body.removeChild(overlay);
         }
@@ -1682,9 +1685,11 @@ function showSettingsPopup() {
     buttonContainer.appendChild(saveButton);
     popup.appendChild(buttonContainer);
     
+    // 添加到DOM并绑定事件
     overlay.appendChild(popup);
     document.body.appendChild(overlay);
     
+    // 点击遮罩层关闭
     overlay.addEventListener('click', (e) => {
         if (e.target === overlay) document.body.removeChild(overlay);
     });
