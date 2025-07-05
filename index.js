@@ -1539,7 +1539,9 @@ function showSettingsPopup() {
         zIndex: '10000',
         display: 'flex',
         justifyContent: 'center',
-        alignItems: 'flex-start'
+        alignItems: 'flex-start',
+        paddingTop: '0', // 不需要额外的顶部内边距
+        overflowY: 'auto' // 添加滚动功能以确保在小屏幕上可以访问所有内容
     });
 
     const popup = document.createElement('div');
@@ -1552,7 +1554,9 @@ function showSettingsPopup() {
         width: '100%',
         maxHeight: '80vh',
         overflowY: 'auto',
-        marginTop: '25vh'
+        marginTop: '80px', // 改为固定的 80px 而不是 25vh
+        position: 'relative', // 添加相对定位
+        top: '0' // 确保从顶部开始
     });
 
     
