@@ -1525,200 +1525,138 @@ function updateOverlay(overlay, message, progressRatio) {
 }
 
 function showSettingsPopup() {
-    const settings = getPluginSettings();
-    
-    // 清除可能存在的旧弹窗
+    // 清除旧弹窗
     document.querySelectorAll('.st-settings-overlay').forEach(el => el.remove());
     
-    // 创建遮罩层
+    // 创建一个简单的弹窗，不使用flex布局
     const overlay = document.createElement('div');
     overlay.className = 'st-settings-overlay';
-    // 使用内联样式确保样式被应用
     overlay.style.cssText = `
         position: fixed !important;
         top: 0 !important;
         left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
         width: 100% !important;
         height: 100% !important;
         background-color: rgba(0,0,0,0.7) !important;
         z-index: 99999 !important;
-        display: flex !important;
-        justify-content: center !important;
-        align-items: center !important;
-        padding: 0 !important;
-        margin: 0 !important;
-        box-sizing: border-box !important;
+        overflow-y: auto !important;
     `;
     
-    // 创建弹窗容器
+    // 创建弹窗容器 - 使用绝对定位而不是flex
     const popup = document.createElement('div');
     popup.className = 'st-settings-popup';
-    // 使用内联样式确保样式被应用
     popup.style.cssText = `
+        position: absolute !important;
+        top: 50% !important;
+        left: 50% !important;
+        transform: translate(-50%, -50%) !important;
         background-color: #2a2a2a !important;
         color: #ffffff !important;
         padding: 20px !important;
         border-radius: 10px !important;
-        width: 90% !important;
-        max-width: 400px !important;
-        max-height: 80vh !important;
+        width: 300px !important;
+        max-height: 80% !important;
         overflow-y: auto !important;
-        box-sizing: border-box !important;
         box-shadow: 0 4px 15px rgba(0,0,0,0.5) !important;
-        position: relative !important;
-        margin: 0 !important;
     `;
     
-    // 添加调试信息
-    const debugInfo = document.createElement('div');
-    debugInfo.style.cssText = `
-        position: absolute;
-        top: 5px;
-        right: 5px;
-        font-size: 10px;
-        color: #aaa;
-    `;
-    debugInfo.textContent = `Screen: ${window.innerWidth}x${window.innerHeight}`;
-    popup.appendChild(debugInfo);
-    
-    // 标题
+    // 简单的标题
     const title = document.createElement('h3');
     title.textContent = '截图设置';
-    title.style.cssText = `
-        margin-top: 0 !important;
-        margin-bottom: 15px !important;
-        text-align: center !important;
-        color: #ffffff !important;
-        font-size: 18px !important;
-    `;
+    title.style.cssText = 'text-align: center; margin-top: 0;';
     popup.appendChild(title);
     
-    const settingsConfig = [
-        { id: 'screenshotDelay', type: 'number', label: '截图前延迟 (ms)', min: 0, max: 2000, step: 50 },
-        { id: 'scrollDelay', type: 'number', label: 'UI更新等待 (ms)', min: 0, max: 2000, step: 50 },
-        { id: 'screenshotScale', type: 'number', label: '渲染比例 (Scale)', min: 0.5, max: 4.0, step: 0.1 },
-        { id: 'useForeignObjectRendering', type: 'checkbox', label: '尝试快速模式 (兼容性低)' },
-        { id: 'autoInstallButtons', type: 'checkbox', label: '自动安装消息按钮' },
-        { id: 'altButtonLocation', type: 'checkbox', label: '按钮备用位置' },
-        { id: 'letterRendering', type: 'checkbox', label: '字形渲染' },
-        { id: 'debugOverlay', type: 'checkbox', label: '显示调试覆盖层' },
-        { id: 'imageFormat', type: 'select', label: '图片格式', 
-          options: [
-              { value: 'jpg', label: 'JPG' },
-              { value: 'png', label: 'PNG' }
-          ]
-        },
-    ];
-    
-    // 创建设置项
-    settingsConfig.forEach(setting => {
-        const settingContainer = document.createElement('div');
-        settingContainer.style.cssText = `
-            margin: 10px 0 !important;
-            display: flex !important;
-            justify-content: space-between !important;
-            align-items: center !important;
-        `;
-        
-        const label = document.createElement('label');
-        label.textContent = setting.label;
-        label.style.cssText = `
-            margin-right: 10px !important;
-            color: #ffffff !important;
-        `;
-        settingContainer.appendChild(label);
-        
-        let input;
-        if (setting.type === 'checkbox') {
-            input = document.createElement('input');
-            input.type = 'checkbox';
-            input.id = `st_setting_${setting.id}`;
-            input.checked = settings[setting.id];
-        } else if (setting.type === 'number') {
-            input = document.createElement('input');
-            input.type = 'number';
-            input.id = `st_setting_${setting.id}`;
-            input.min = setting.min;
-            input.max = setting.max;
-            input.step = setting.step;
-            input.value = settings[setting.id];
-            input.style.width = '80px';
-        } else if (setting.type === 'select') {
-            input = document.createElement('select');
-            input.id = `st_setting_${setting.id}`;
-            setting.options.forEach(option => {
-                const optElement = document.createElement('option');
-                optElement.value = option.value;
-                optElement.textContent = option.label;
-                if (settings[setting.id] === option.value) {
-                    optElement.selected = true;
-                }
-                input.appendChild(optElement);
-            });
-        }
-        
-        settingContainer.appendChild(input);
-        popup.appendChild(settingContainer);
-    });
-    
-    // 按钮容器
-    const buttonContainer = document.createElement('div');
-    buttonContainer.style.cssText = `
-        display: flex !important;
-        justify-content: center !important;
-        margin-top: 20px !important;
+    // 添加设置项 - 使用简单的布局
+    const settings = getPluginSettings();
+    const settingsHTML = `
+        <div style="margin-bottom: 15px;">
+            <label>截图前延迟 (ms):</label>
+            <input type="number" id="st_setting_screenshotDelay" min="0" max="2000" step="50" value="${settings.screenshotDelay}" style="width: 80px; float: right;">
+        </div>
+        <div style="margin-bottom: 15px; clear: both;">
+            <label>UI更新等待 (ms):</label>
+            <input type="number" id="st_setting_scrollDelay" min="0" max="2000" step="50" value="${settings.scrollDelay}" style="width: 80px; float: right;">
+        </div>
+        <div style="margin-bottom: 15px; clear: both;">
+            <label>渲染比例 (Scale):</label>
+            <input type="number" id="st_setting_screenshotScale" min="0.5" max="4.0" step="0.1" value="${settings.screenshotScale}" style="width: 80px; float: right;">
+        </div>
+        <div style="margin-bottom: 15px; clear: both;">
+            <label>尝试快速模式:</label>
+            <input type="checkbox" id="st_setting_useForeignObjectRendering" ${settings.useForeignObjectRendering ? 'checked' : ''} style="float: right;">
+        </div>
+        <div style="margin-bottom: 15px; clear: both;">
+            <label>自动安装消息按钮:</label>
+            <input type="checkbox" id="st_setting_autoInstallButtons" ${settings.autoInstallButtons ? 'checked' : ''} style="float: right;">
+        </div>
+        <div style="margin-bottom: 15px; clear: both;">
+            <label>按钮备用位置:</label>
+            <input type="checkbox" id="st_setting_altButtonLocation" ${settings.altButtonLocation ? 'checked' : ''} style="float: right;">
+        </div>
+        <div style="margin-bottom: 15px; clear: both;">
+            <label>字形渲染:</label>
+            <input type="checkbox" id="st_setting_letterRendering" ${settings.letterRendering ? 'checked' : ''} style="float: right;">
+        </div>
+        <div style="margin-bottom: 15px; clear: both;">
+            <label>显示调试覆盖层:</label>
+            <input type="checkbox" id="st_setting_debugOverlay" ${settings.debugOverlay ? 'checked' : ''} style="float: right;">
+        </div>
+        <div style="margin-bottom: 15px; clear: both;">
+            <label>图片格式:</label>
+            <select id="st_setting_imageFormat" style="float: right;">
+                <option value="jpg" ${settings.imageFormat === 'jpg' ? 'selected' : ''}>JPG</option>
+                <option value="png" ${settings.imageFormat === 'png' ? 'selected' : ''}>PNG</option>
+            </select>
+        </div>
+        <div style="text-align: center; margin-top: 20px; clear: both;">
+            <button id="st_settings_save_btn" style="padding: 8px 16px; background-color: #4dabf7; border: none; color: white; border-radius: 4px; cursor: pointer;">保存设置</button>
+        </div>
+        <div id="st_settings_status" style="text-align: center; margin-top: 10px; color: #4cb944; display: none;">
+            设置已保存!
+        </div>
     `;
     
-    // 保存按钮
-    const saveButton = document.createElement('button');
-    saveButton.textContent = '保存设置';
-    saveButton.style.cssText = `
-        padding: 8px 16px !important;
-        border-radius: 4px !important;
-        background-color: #4dabf7 !important;
-        border: none !important;
-        color: white !important;
-        cursor: pointer !important;
-        font-size: 14px !important;
-    `;
+    // 直接插入HTML
+    const settingsContainer = document.createElement('div');
+    settingsContainer.innerHTML = settingsHTML;
+    popup.appendChild(settingsContainer);
     
-    saveButton.addEventListener('click', () => {
-        const settings = getPluginSettings();
+    // 添加到DOM
+    overlay.appendChild(popup);
+    document.body.appendChild(overlay);
+    
+    // 绑定保存按钮事件
+    document.getElementById('st_settings_save_btn').addEventListener('click', function() {
+        const newSettings = {
+            screenshotDelay: parseInt(document.getElementById('st_setting_screenshotDelay').value) || defaultSettings.screenshotDelay,
+            scrollDelay: parseInt(document.getElementById('st_setting_scrollDelay').value) || defaultSettings.scrollDelay,
+            screenshotScale: parseFloat(document.getElementById('st_setting_screenshotScale').value) || defaultSettings.screenshotScale,
+            useForeignObjectRendering: document.getElementById('st_setting_useForeignObjectRendering').checked,
+            autoInstallButtons: document.getElementById('st_setting_autoInstallButtons').checked,
+            altButtonLocation: document.getElementById('st_setting_altButtonLocation').checked,
+            letterRendering: document.getElementById('st_setting_letterRendering').checked,
+            debugOverlay: document.getElementById('st_setting_debugOverlay').checked,
+            imageFormat: document.getElementById('st_setting_imageFormat').value
+        };
         
-        settingsConfig.forEach(setting => {
-            const input = document.getElementById(`st_setting_${setting.id}`);
-            if (setting.type === 'checkbox') {
-                settings[setting.id] = input.checked;
-            } else if (setting.type === 'number') {
-                settings[setting.id] = parseFloat(input.value);
-                if (isNaN(settings[setting.id])) {
-                    settings[setting.id] = defaultSettings[setting.id];
-                }
-            } else if (setting.type === 'select') {
-                settings[setting.id] = input.value;
-            }
-        });
-        
+        // 更新设置
+        Object.assign(extension_settings[PLUGIN_ID], newSettings);
         saveSettingsDebounced();
         loadConfig();
         
-        // 显示成功消息
-        const successMsg = document.createElement('div');
-        successMsg.textContent = '设置已保存！';
-        successMsg.style.cssText = `
-            color: #4cb944 !important;
-            text-align: center !important;
-            margin-top: 10px !important;
-        `;
-        buttonContainer.appendChild(successMsg);
+        // 显示保存成功
+        const statusEl = document.getElementById('st_settings_status');
+        statusEl.style.display = 'block';
         
-        // 3秒后关闭
+        // 1.5秒后关闭
         setTimeout(() => {
             if (overlay.parentElement) {
                 document.body.removeChild(overlay);
             }
             
-            if (settings.autoInstallButtons) {
+            if (newSettings.autoInstallButtons) {
                 document.querySelectorAll(`.${config.buttonClass}`).forEach(btn => btn.remove());
                 installScreenshotButtons();
             } else {
@@ -1727,25 +1665,11 @@ function showSettingsPopup() {
         }, 1500);
     });
     
-    buttonContainer.appendChild(saveButton);
-    popup.appendChild(buttonContainer);
-    
-    // 添加到DOM
-    overlay.appendChild(popup);
-    document.body.appendChild(overlay);
-    
     // 点击遮罩层关闭
-    overlay.addEventListener('click', (e) => {
+    overlay.addEventListener('click', function(e) {
         if (e.target === overlay) {
             document.body.removeChild(overlay);
         }
-    });
-    
-    // 输出调试信息到控制台
-    console.log('[html2canvas-pro] 弹窗尺寸:', {
-        viewport: `${window.innerWidth}x${window.innerHeight}`,
-        overlay: `${overlay.offsetWidth}x${overlay.offsetHeight}`,
-        popup: `${popup.offsetWidth}x${popup.offsetHeight}`
     });
 }
 
