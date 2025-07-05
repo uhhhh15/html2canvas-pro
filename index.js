@@ -1540,120 +1540,168 @@ function updateOverlay(overlay, message, progressRatio) {
 }
 
 function showSettingsPopup() {
-    // 清除旧弹窗
-    document.querySelectorAll('.st-settings-overlay').forEach(el => el.remove());
-    
-    // 创建一个简单的弹窗，不使用flex布局
-    const overlay = document.createElement('div');
-    overlay.className = 'st-settings-overlay';
-    overlay.style.cssText = `
-        position: fixed !important;
-        top: 0 !important;
-        left: 0 !important;
-        right: 0 !important;
-        bottom: 0 !important;
-        width: 100% !important;
-        height: 100% !important;
-        background-color: rgba(0,0,0,0.7) !important;
-        z-index: 99999 !important;
-        overflow-y: auto !important;
-    `;
-    
-    // 创建弹窗容器 - 使用绝对定位而不是flex
-    const popup = document.createElement('div');
-    popup.className = 'st-settings-popup';
-    popup.style.cssText = `
-        position: absolute !important;
-        top: 50% !important;
-        left: 50% !important;
-        transform: translate(-50%, -50%) !important;
-        background-color: #2a2a2a !important;
-        color: #ffffff !important;
-        padding: 20px !important;
-        border-radius: 10px !important;
-        width: 300px !important;
-        max-height: 80% !important;
-        overflow-y: auto !important;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.5) !important;
-    `;
-    
-    // 简单的标题
-    const title = document.createElement('h3');
-    title.textContent = '截图设置';
-    title.style.cssText = 'text-align: center; margin-top: 0;';
-    popup.appendChild(title);
-    
-    // 添加设置项 - 使用简单的布局
     const settings = getPluginSettings();
-    const settingsHTML = `
-        <div style="margin-bottom: 15px;">
-            <label>截图前延迟 (ms):</label>
-            <input type="number" id="st_setting_screenshotDelay" min="0" max="2000" step="50" value="${settings.screenshotDelay}" style="width: 80px; float: right;">
-        </div>
-        <div style="margin-bottom: 15px; clear: both;">
-            <label>UI更新等待 (ms):</label>
-            <input type="number" id="st_setting_scrollDelay" min="0" max="2000" step="50" value="${settings.scrollDelay}" style="width: 80px; float: right;">
-        </div>
-        <div style="margin-bottom: 15px; clear: both;">
-            <label>渲染比例 (Scale):</label>
-            <input type="number" id="st_setting_screenshotScale" min="0.5" max="4.0" step="0.1" value="${settings.screenshotScale}" style="width: 80px; float: right;">
-        </div>
-        <div style="margin-bottom: 15px; clear: both;">
-            <label>尝试快速模式:</label>
-            <input type="checkbox" id="st_setting_useForeignObjectRendering" ${settings.useForeignObjectRendering ? 'checked' : ''} style="float: right;">
-        </div>
-        <div style="margin-bottom: 15px; clear: both;">
-            <label>自动安装消息按钮:</label>
-            <input type="checkbox" id="st_setting_autoInstallButtons" ${settings.autoInstallButtons ? 'checked' : ''} style="float: right;">
-        </div>
-        <div style="margin-bottom: 15px; clear: both;">
-            <label>按钮备用位置:</label>
-            <input type="checkbox" id="st_setting_altButtonLocation" ${settings.altButtonLocation ? 'checked' : ''} style="float: right;">
-        </div>
-        <div style="margin-bottom: 15px; clear: both;">
-            <label>字形渲染:</label>
-            <input type="checkbox" id="st_setting_letterRendering" ${settings.letterRendering ? 'checked' : ''} style="float: right;">
-        </div>
-        <div style="margin-bottom: 15px; clear: both;">
-            <label>显示调试覆盖层:</label>
-            <input type="checkbox" id="st_setting_debugOverlay" ${settings.debugOverlay ? 'checked' : ''} style="float: right;">
-        </div>
-        <div style="margin-bottom: 15px; clear: both;">
-            <label>图片格式:</label>
-            <select id="st_setting_imageFormat" style="float: right;">
-                <option value="jpg" ${settings.imageFormat === 'jpg' ? 'selected' : ''}>JPG</option>
-                <option value="png" ${settings.imageFormat === 'png' ? 'selected' : ''}>PNG</option>
-            </select>
-        </div>
-        <div style="text-align: center; margin-top: 20px; clear: both;">
-            <button id="st_settings_save_btn" style="padding: 8px 16px; background-color: #4dabf7; border: none; color: white; border-radius: 4px; cursor: pointer;">保存设置</button>
-        </div>
-        <div id="st_settings_status" style="text-align: center; margin-top: 10px; color: #4cb944; display: none;">
-            设置已保存!
-        </div>
-    `;
     
-    // 直接插入HTML
-    const settingsContainer = document.createElement('div');
-    settingsContainer.innerHTML = settingsHTML;
-    popup.appendChild(settingsContainer);
+    // 清除可能存在的旧弹窗
+    $('#html2canvas-settings-popup').remove();
+    
+    // 创建弹窗HTML
+    const popupHtml = `
+    <div id="html2canvas-settings-popup" class="html2canvas-settings-popup">
+        <div class="html2canvas-popup-header">
+            <span class="html2canvas-popup-title">截图设置</span>
+            <button id="html2canvas-popup-close" class="html2canvas-popup-close-btn">×</button>
+        </div>
+        <div class="html2canvas-popup-content">
+            <div class="html2canvas-option">
+                <label for="st_h2c_screenshotDelay">截图前延迟 (ms):</label>
+                <input type="number" id="st_h2c_screenshotDelay" min="0" max="2000" step="50" value="${settings.screenshotDelay}">
+            </div>
+            <div class="html2canvas-option">
+                <label for="st_h2c_scrollDelay">UI更新等待 (ms):</label>
+                <input type="number" id="st_h2c_scrollDelay" min="0" max="2000" step="50" value="${settings.scrollDelay}">
+            </div>
+            <div class="html2canvas-option">
+                <label for="st_h2c_screenshotScale">渲染比例 (Scale):</label>
+                <input type="number" id="st_h2c_screenshotScale" min="0.5" max="4.0" step="0.1" value="${settings.screenshotScale}">
+            </div>
+            <div class="html2canvas-option">
+                <label for="st_h2c_useForeignObjectRendering">尝试快速模式 (兼容性低):</label>
+                <input type="checkbox" id="st_h2c_useForeignObjectRendering" ${settings.useForeignObjectRendering ? 'checked' : ''}>
+            </div>
+            <div class="html2canvas-option">
+                <label for="st_h2c_autoInstallButtons">自动安装消息按钮:</label>
+                <input type="checkbox" id="st_h2c_autoInstallButtons" ${settings.autoInstallButtons ? 'checked' : ''}>
+            </div>
+            <div class="html2canvas-option">
+                <label for="st_h2c_altButtonLocation">按钮备用位置:</label>
+                <input type="checkbox" id="st_h2c_altButtonLocation" ${settings.altButtonLocation ? 'checked' : ''}>
+            </div>
+            <div class="html2canvas-option">
+                <label for="st_h2c_letterRendering">字形渲染:</label>
+                <input type="checkbox" id="st_h2c_letterRendering" ${settings.letterRendering ? 'checked' : ''}>
+            </div>
+            <div class="html2canvas-option">
+                <label for="st_h2c_debugOverlay">显示调试覆盖层:</label>
+                <input type="checkbox" id="st_h2c_debugOverlay" ${settings.debugOverlay ? 'checked' : ''}>
+            </div>
+            <div class="html2canvas-option">
+                <label for="st_h2c_imageFormat">图片格式:</label>
+                <select id="st_h2c_imageFormat">
+                    <option value="jpg" ${settings.imageFormat === 'jpg' ? 'selected' : ''}>JPG</option>
+                    <option value="png" ${settings.imageFormat === 'png' ? 'selected' : ''}>PNG</option>
+                </select>
+            </div>
+        </div>
+        <div class="html2canvas-popup-footer">
+            <button id="html2canvas-save-btn" class="html2canvas-btn">保存设置</button>
+            <div id="html2canvas-save-status" class="html2canvas-save-status" style="display:none;">设置已保存!</div>
+        </div>
+    </div>`;
+    
+    // 添加CSS样式
+    if (!$('#html2canvas-popup-styles').length) {
+        const styleHtml = `
+        <style id="html2canvas-popup-styles">
+            .html2canvas-settings-popup {
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background-color: #2a2a2a;
+                color: #ffffff;
+                border-radius: 8px;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+                width: 90%;
+                max-width: 400px;
+                max-height: 90vh;
+                overflow-y: auto;
+                z-index: 10000;
+                display: none;
+            }
+            .html2canvas-popup-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 15px;
+                border-bottom: 1px solid #444;
+            }
+            .html2canvas-popup-title {
+                font-size: 18px;
+                font-weight: bold;
+            }
+            .html2canvas-popup-close-btn {
+                background: none;
+                border: none;
+                color: #aaa;
+                font-size: 20px;
+                cursor: pointer;
+            }
+            .html2canvas-popup-content {
+                padding: 15px;
+            }
+            .html2canvas-option {
+                margin-bottom: 15px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            .html2canvas-option label {
+                margin-right: 10px;
+            }
+            .html2canvas-popup-footer {
+                padding: 15px;
+                text-align: center;
+                border-top: 1px solid #444;
+            }
+            .html2canvas-btn {
+                padding: 8px 16px;
+                background-color: #4dabf7;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+            }
+            .html2canvas-save-status {
+                margin-top: 10px;
+                color: #4cb944;
+            }
+            @media screen and (max-width: 768px) {
+                .html2canvas-settings-popup {
+                    width: 95%;
+                    max-height: 80vh;
+                }
+            }
+        </style>`;
+        $('head').append(styleHtml);
+    }
     
     // 添加到DOM
-    overlay.appendChild(popup);
-    document.body.appendChild(overlay);
+    $('body').append(popupHtml);
+    
+    // 显示弹窗
+    const $popup = $('#html2canvas-settings-popup');
+    $popup.fadeIn(200);
+    
+    // 绑定关闭按钮事件
+    $('#html2canvas-popup-close').on('click', function() {
+        $popup.fadeOut(200, function() {
+            $popup.remove();
+        });
+    });
     
     // 绑定保存按钮事件
-    document.getElementById('st_settings_save_btn').addEventListener('click', function() {
+    $('#html2canvas-save-btn').on('click', function() {
         const newSettings = {
-            screenshotDelay: parseInt(document.getElementById('st_setting_screenshotDelay').value) || defaultSettings.screenshotDelay,
-            scrollDelay: parseInt(document.getElementById('st_setting_scrollDelay').value) || defaultSettings.scrollDelay,
-            screenshotScale: parseFloat(document.getElementById('st_setting_screenshotScale').value) || defaultSettings.screenshotScale,
-            useForeignObjectRendering: document.getElementById('st_setting_useForeignObjectRendering').checked,
-            autoInstallButtons: document.getElementById('st_setting_autoInstallButtons').checked,
-            altButtonLocation: document.getElementById('st_setting_altButtonLocation').checked,
-            letterRendering: document.getElementById('st_setting_letterRendering').checked,
-            debugOverlay: document.getElementById('st_setting_debugOverlay').checked,
-            imageFormat: document.getElementById('st_setting_imageFormat').value
+            screenshotDelay: parseInt($('#st_h2c_screenshotDelay').val()) || defaultSettings.screenshotDelay,
+            scrollDelay: parseInt($('#st_h2c_scrollDelay').val()) || defaultSettings.scrollDelay,
+            screenshotScale: parseFloat($('#st_h2c_screenshotScale').val()) || defaultSettings.screenshotScale,
+            useForeignObjectRendering: $('#st_h2c_useForeignObjectRendering').prop('checked'),
+            autoInstallButtons: $('#st_h2c_autoInstallButtons').prop('checked'),
+            altButtonLocation: $('#st_h2c_altButtonLocation').prop('checked'),
+            letterRendering: $('#st_h2c_letterRendering').prop('checked'),
+            debugOverlay: $('#st_h2c_debugOverlay').prop('checked'),
+            imageFormat: $('#st_h2c_imageFormat').val()
         };
         
         // 更新设置
@@ -1662,28 +1710,30 @@ function showSettingsPopup() {
         loadConfig();
         
         // 显示保存成功
-        const statusEl = document.getElementById('st_settings_status');
-        statusEl.style.display = 'block';
+        const $status = $('#html2canvas-save-status');
+        $status.fadeIn(200);
         
-        // 1.5秒后关闭
-        setTimeout(() => {
-        if (overlay.parentElement) {
-            document.body.removeChild(overlay);
-        }
+        // 1.5秒后隐藏状态
+        setTimeout(function() {
+            $status.fadeOut(200);
+        }, 1500);
         
-            if (newSettings.autoInstallButtons) {
+        // 处理按钮
+        if (newSettings.autoInstallButtons) {
             document.querySelectorAll(`.${config.buttonClass}`).forEach(btn => btn.remove());
             installScreenshotButtons();
         } else {
             document.querySelectorAll(`.${config.buttonClass}`).forEach(btn => btn.remove());
         }
-        }, 1500);
     });
     
-    // 点击遮罩层关闭
-    overlay.addEventListener('click', function(e) {
-        if (e.target === overlay) {
-            document.body.removeChild(overlay);
+    // 点击弹窗外部关闭
+    $(document).on('mousedown.html2canvasPopup', function(e) {
+        if (!$(e.target).closest('#html2canvas-settings-popup').length) {
+            $popup.fadeOut(200, function() {
+                $popup.remove();
+                $(document).off('mousedown.html2canvasPopup');
+            });
         }
     });
 }
