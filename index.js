@@ -233,10 +233,25 @@ async function getDynamicBackground(elementForContext) {
     return { color: backgroundColor, imageInfo: backgroundImageInfo };
 }
 
+// 在jQuery初始化函数中添加
+function ensureMobileViewport() {
+    let viewportMeta = document.querySelector('meta[name="viewport"]');
+    if (!viewportMeta) {
+        viewportMeta = document.createElement('meta');
+        viewportMeta.name = 'viewport';
+        document.head.appendChild(viewportMeta);
+    }
+    viewportMeta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+    console.log('[html2canvas-pro] 已设置移动设备视口');
+}
 
+// 在初始化时调用
 jQuery(async () => {
     console.log(`${PLUGIN_NAME}: 插件初始化中...`);
-
+    
+    // 确保移动设备视口设置正确
+    ensureMobileViewport();
+    
     try {
         await loadScript(`scripts/extensions/third-party/${PLUGIN_ID}/html2canvas-pro.min.js`);
     } catch (error) {
@@ -1652,16 +1667,16 @@ function showSettingsPopup() {
         
         // 1.5秒后关闭
         setTimeout(() => {
-            if (overlay.parentElement) {
-                document.body.removeChild(overlay);
-            }
-            
+        if (overlay.parentElement) {
+            document.body.removeChild(overlay);
+        }
+        
             if (newSettings.autoInstallButtons) {
-                document.querySelectorAll(`.${config.buttonClass}`).forEach(btn => btn.remove());
-                installScreenshotButtons();
-            } else {
-                document.querySelectorAll(`.${config.buttonClass}`).forEach(btn => btn.remove());
-            }
+            document.querySelectorAll(`.${config.buttonClass}`).forEach(btn => btn.remove());
+            installScreenshotButtons();
+        } else {
+            document.querySelectorAll(`.${config.buttonClass}`).forEach(btn => btn.remove());
+        }
         }, 1500);
     });
     
@@ -1834,7 +1849,7 @@ function showCaptureLogsPopup() {
             
             logEntry.innerHTML = `<span class="log-time">${time}</span> <span class="log-level ${entry.level}">[${entry.level}]</span> ${entry.message}`;
             
-            if (entry.data) {
+        if (entry.data) {
                 const detailsBtn = document.createElement('button');
                 detailsBtn.textContent = '查看详情';
                 detailsBtn.style.marginLeft = '10px';
@@ -1886,7 +1901,7 @@ function showCaptureLogsPopup() {
     
     levelFilter.addEventListener('change', filterLogs);
     searchInput.addEventListener('input', filterLogs);
-    
+
     // 关闭按钮
     const closeBtn = document.createElement('button');
     closeBtn.textContent = '关闭';
@@ -1926,5 +1941,36 @@ function showCaptureLogsPopup() {
 
     overlay.appendChild(popup);
     document.body.appendChild(overlay);
+}
+
+// 在适当的地方添加这个函数
+function showSettingsUsingPopup() {
+    // 使用SillyTavern的内置弹窗系统
+    if (typeof callPopup === 'function') {
+        const settings = getPluginSettings();
+        const popupContent = `
+            <div id="html2canvas_settings_popup" style="padding: 10px;">
+                <h3>截图设置</h3>
+                <!-- 设置项 -->
+                <div class="flex-container flexGap5">
+                    <label for="st_h2c_screenshotDelay">截图前延迟 (ms):</label>
+                    <input type="number" id="st_h2c_screenshotDelay" min="0" max="2000" step="50" value="${settings.screenshotDelay}">
+                </div>
+                <!-- 其他设置项 -->
+                <!-- ... -->
+            </div>
+        `;
+        
+        callPopup(popupContent, 'html2canvas-settings');
+        
+        // 绑定保存事件
+        $('#save_html2canvas_settings').on('click', function() {
+            // 保存设置逻辑
+        });
+    } else {
+        console.error('SillyTavern callPopup 函数不可用，无法显示设置面板');
+        // 回退到原来的方法
+        showSettingsPopup();
+    }
 }
 
