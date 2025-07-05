@@ -1673,8 +1673,11 @@ function showCaptureLogsPopup() {
         backgroundColor: 'rgba(0,0,0,0.7)',
         zIndex: '10000',
         display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center'
+        // --- 核心修正 ---
+        // 使用 padding 来创建安全边距，而不是让子元素自己算百分比
+        // 这为弹窗提供了_已经计算好_的可用空间
+        padding: '5vh 5vw', // 上下 5% 视口高度，左右 5% 视口宽度的边距
+        boxSizing: 'border-box', // 确保 padding 不会增加 overlay 的总尺寸
     });
 
     const popup = document.createElement('div');
@@ -1683,20 +1686,30 @@ function showCaptureLogsPopup() {
         color: '#ffffff',
         padding: '20px',
         borderRadius: '5px',
-        maxHeight: '80%',
         overflowY: 'auto',
-        width: '80%'
+        // --- 核心修正 ---
+        // 移除导致问题的百分比尺寸
+        //- maxHeight: '80%', 
+        //- width: '80%',
+        // 让弹窗填满父元素（overlay）的内边距所限定的区域
+        width: '100%',
+        height: '100%', // 或者使用 'auto' 让其内容决定高度，但100%配合父级padding效果更好
+        display: 'flex', // 使用 flex 布局来更好地管理内部元素
+        flexDirection: 'column', // 垂直排列：标题、筛选、日志、按钮
+        boxSizing: 'border-box', // 确保弹窗的 padding 不会使其超出父容器
     });
 
     // 标题
     const title = document.createElement('h3');
     title.textContent = `${PLUGIN_NAME} 日志`;
     title.style.marginTop = '0';
+    title.style.flexShrink = '0'; // 防止标题在内容过多时被压缩
     popup.appendChild(title);
 
     // 添加操作筛选器
     const filterDiv = document.createElement('div');
     filterDiv.style.marginBottom = '10px';
+    filterDiv.style.flexShrink = '0'; // 防止筛选器被压缩
     
     const levelFilter = document.createElement('select');
     levelFilter.innerHTML = `
@@ -1721,93 +1734,62 @@ function showCaptureLogsPopup() {
     
     // 创建日志容器
     const logsContainer = document.createElement('div');
-    logsContainer.style.maxHeight = '500px';
-    logsContainer.style.overflowY = 'auto';
+    // --- 核心修正 ---
+    // 不再需要在这里设置 max-height，因为父元素 popup 已经有了 overflowY
+    logsContainer.style.overflowY = 'auto'; // 日志内容自己滚动
+    logsContainer.style.flexGrow = '1';     // 让日志容器占据所有剩余空间
+    logsContainer.style.minHeight = '0';    // flex布局中的一个重要技巧，防止内容溢出
     
-    // 按操作分组显示日志
+    // 按操作分组显示日志 (这部分逻辑保持不变)
     const groupedLogs = {};
     captureLogger.logs.forEach(entry => {
-        // 提取操作标识符，例如 [单元素截图], [选择元素] 等
         const match = entry.message.match(/^\[(.*?)\]/);
         const group = match ? match[1] : '其他';
-        
-        if (!groupedLogs[group]) {
-            groupedLogs[group] = [];
-        }
+        if (!groupedLogs[group]) groupedLogs[group] = [];
         groupedLogs[group].push(entry);
     });
     
-    // 为每个操作创建可折叠的日志组
     Object.keys(groupedLogs).forEach(group => {
         const groupDiv = document.createElement('details');
-        groupDiv.open = true; // 默认展开
-        
+        groupDiv.open = true;
         const summary = document.createElement('summary');
         summary.textContent = `${group} (${groupedLogs[group].length}条日志)`;
         summary.style.fontWeight = 'bold';
         summary.style.cursor = 'pointer';
         groupDiv.appendChild(summary);
-        
         groupedLogs[group].forEach(entry => {
             const logEntry = document.createElement('div');
             logEntry.className = `log-entry log-${entry.level}`;
             logEntry.dataset.level = entry.level;
             logEntry.dataset.text = entry.message.toLowerCase();
-            
-            const time = new Date(entry.timestamp).toLocaleTimeString('zh-CN', {
-                hour12: false,
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                fractionalSecondDigits: 3
-            });
-            
+            const time = new Date(entry.timestamp).toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 });
             logEntry.innerHTML = `<span class="log-time">${time}</span> <span class="log-level ${entry.level}">[${entry.level}]</span> ${entry.message}`;
-            
-        if (entry.data) {
+            if (entry.data) {
                 const detailsBtn = document.createElement('button');
                 detailsBtn.textContent = '查看详情';
-                detailsBtn.style.marginLeft = '10px';
-                detailsBtn.style.fontSize = 'small';
-                
+                detailsBtn.style.cssText = 'margin-left: 10px; font-size: small;';
                 const dataDiv = document.createElement('pre');
                 dataDiv.textContent = JSON.stringify(entry.data, null, 2);
-                dataDiv.style.display = 'none';
-                dataDiv.style.backgroundColor = '#1e1e1e';
-                dataDiv.style.padding = '8px';
-                dataDiv.style.marginTop = '5px';
-                dataDiv.style.borderRadius = '4px';
-                dataDiv.style.maxHeight = '200px';
-                dataDiv.style.overflowY = 'auto';
-                
+                dataDiv.style.cssText = 'display: none; background-color: #1e1e1e; padding: 8px; margin-top: 5px; border-radius: 4px; max-height: 200px; overflow-y: auto;';
                 detailsBtn.onclick = () => {
-                    if (dataDiv.style.display === 'none') {
-                        dataDiv.style.display = 'block';
-                        detailsBtn.textContent = '隐藏详情';
-                    } else {
-                        dataDiv.style.display = 'none';
-                        detailsBtn.textContent = '查看详情';
-                    }
+                    dataDiv.style.display = dataDiv.style.display === 'none' ? 'block' : 'none';
+                    detailsBtn.textContent = dataDiv.style.display === 'none' ? '查看详情' : '隐藏详情';
                 };
-                
                 logEntry.appendChild(detailsBtn);
                 logEntry.appendChild(dataDiv);
             }
-            
             groupDiv.appendChild(logEntry);
         });
-        
         logsContainer.appendChild(groupDiv);
     });
     
     popup.appendChild(logsContainer);
     
-    // 实现筛选功能
+    // 实现筛选功能 (这部分逻辑保持不变)
     function filterLogs() {
         const level = levelFilter.value;
         const searchText = searchInput.value.toLowerCase();
-        
-        document.querySelectorAll('.log-entry').forEach(entry => {
+        logsContainer.querySelectorAll('.log-entry').forEach(entry => {
             const matchesLevel = level === 'all' || entry.dataset.level === level;
             const matchesSearch = !searchText || entry.dataset.text.includes(searchText);
             entry.style.display = matchesLevel && matchesSearch ? 'block' : 'none';
@@ -1817,30 +1799,19 @@ function showCaptureLogsPopup() {
     levelFilter.addEventListener('change', filterLogs);
     searchInput.addEventListener('input', filterLogs);
 
-    // 关闭按钮
-    const closeBtn = document.createElement('button');
-    closeBtn.textContent = '关闭';
-    Object.assign(closeBtn.style, {
-        marginTop: '10px',
-        padding: '8px 12px',
-        cursor: 'pointer'
-    });
-    closeBtn.addEventListener('click', () => {
-        document.body.removeChild(overlay);
-    });
-    popup.appendChild(closeBtn);
+    // 按钮容器
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.marginTop = '15px';
+    buttonContainer.style.textAlign = 'right'; // 让按钮靠右
+    buttonContainer.style.flexShrink = '0'; // 防止按钮容器被压缩
 
     // 下载日志按钮
     const downloadBtn = document.createElement('button');
     downloadBtn.textContent = '下载日志';
-    Object.assign(downloadBtn.style, {
-        marginLeft:'10px',
-        padding:   '8px 12px',
-        cursor:    'pointer'
-    });
+    Object.assign(downloadBtn.style, { padding: '8px 12px', cursor: 'pointer' });
     downloadBtn.addEventListener('click', () => {
         const textContent = captureLogger.logs.map(entry => {
-            let line = `[${entry.level}] ${entry.message}`;
+            let line = `[${entry.timestamp}][${entry.level}] ${entry.message}`;
             if (entry.data) line += '\n' + JSON.stringify(entry.data, null, 2);
             return line;
         }).join('\n\n');
@@ -1852,10 +1823,28 @@ function showCaptureLogsPopup() {
         a.click();
         URL.revokeObjectURL(url);
     });
-    popup.appendChild(downloadBtn);
+    buttonContainer.appendChild(downloadBtn);
+
+    // 关闭按钮
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '关闭';
+    Object.assign(closeBtn.style, { marginLeft: '10px', padding: '8px 12px', cursor: 'pointer' });
+    closeBtn.addEventListener('click', () => {
+        document.body.removeChild(overlay);
+    });
+    buttonContainer.appendChild(closeBtn);
+    
+    popup.appendChild(buttonContainer);
 
     overlay.appendChild(popup);
     document.body.appendChild(overlay);
+
+    // 点击遮罩层关闭弹窗
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+            document.body.removeChild(overlay);
+        }
+    });
 }
 
 // 在适当的地方添加这个函数
