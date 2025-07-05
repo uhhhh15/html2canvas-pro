@@ -1527,42 +1527,70 @@ function updateOverlay(overlay, message, progressRatio) {
 function showSettingsPopup() {
     const settings = getPluginSettings();
     
+    // 清除可能存在的旧弹窗
+    document.querySelectorAll('.st-settings-overlay').forEach(el => el.remove());
+    
     // 创建遮罩层
     const overlay = document.createElement('div');
     overlay.className = 'st-settings-overlay';
-    Object.assign(overlay.style, {
-        position: 'fixed',
-        top: '0',
-        left: '0',
-        width: '100%',
-        height: '100%',
-        backgroundColor: 'rgba(0,0,0,0.7)',
-        zIndex: '10000',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center' // 使用居中对齐
-    });
-
+    // 使用内联样式确保样式被应用
+    overlay.style.cssText = `
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        background-color: rgba(0,0,0,0.7) !important;
+        z-index: 99999 !important;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        box-sizing: border-box !important;
+    `;
+    
     // 创建弹窗容器
     const popup = document.createElement('div');
     popup.className = 'st-settings-popup';
-    Object.assign(popup.style, {
-        backgroundColor: '#2a2a2a',
-        padding: '20px',
-        borderRadius: '10px',
-        maxWidth: '400px',
-        width: '90%', // 使用百分比宽度更适合移动设备
-        maxHeight: '80vh',
-        overflowY: 'auto',
-        margin: '10px' // 添加边距，确保不会紧贴屏幕边缘
-    });
-
+    // 使用内联样式确保样式被应用
+    popup.style.cssText = `
+        background-color: #2a2a2a !important;
+        color: #ffffff !important;
+        padding: 20px !important;
+        border-radius: 10px !important;
+        width: 90% !important;
+        max-width: 400px !important;
+        max-height: 80vh !important;
+        overflow-y: auto !important;
+        box-sizing: border-box !important;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.5) !important;
+        position: relative !important;
+        margin: 0 !important;
+    `;
+    
+    // 添加调试信息
+    const debugInfo = document.createElement('div');
+    debugInfo.style.cssText = `
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        font-size: 10px;
+        color: #aaa;
+    `;
+    debugInfo.textContent = `Screen: ${window.innerWidth}x${window.innerHeight}`;
+    popup.appendChild(debugInfo);
+    
     // 标题
     const title = document.createElement('h3');
     title.textContent = '截图设置';
-    title.style.marginTop = '0';
-    title.style.marginBottom = '15px';
-    title.style.textAlign = 'center';
+    title.style.cssText = `
+        margin-top: 0 !important;
+        margin-bottom: 15px !important;
+        text-align: center !important;
+        color: #ffffff !important;
+        font-size: 18px !important;
+    `;
     popup.appendChild(title);
     
     const settingsConfig = [
@@ -1585,14 +1613,19 @@ function showSettingsPopup() {
     // 创建设置项
     settingsConfig.forEach(setting => {
         const settingContainer = document.createElement('div');
-        settingContainer.style.margin = '10px 0';
-        settingContainer.style.display = 'flex';
-        settingContainer.style.justifyContent = 'space-between';
-        settingContainer.style.alignItems = 'center';
+        settingContainer.style.cssText = `
+            margin: 10px 0 !important;
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+        `;
         
         const label = document.createElement('label');
         label.textContent = setting.label;
-        label.style.marginRight = '10px';
+        label.style.cssText = `
+            margin-right: 10px !important;
+            color: #ffffff !important;
+        `;
         settingContainer.appendChild(label);
         
         let input;
@@ -1630,19 +1663,24 @@ function showSettingsPopup() {
     
     // 按钮容器
     const buttonContainer = document.createElement('div');
-    buttonContainer.style.display = 'flex';
-    buttonContainer.style.justifyContent = 'center';
-    buttonContainer.style.marginTop = '20px';
+    buttonContainer.style.cssText = `
+        display: flex !important;
+        justify-content: center !important;
+        margin-top: 20px !important;
+    `;
     
     // 保存按钮
     const saveButton = document.createElement('button');
     saveButton.textContent = '保存设置';
-    saveButton.style.padding = '8px 16px';
-    saveButton.style.borderRadius = '4px';
-    saveButton.style.backgroundColor = '#4dabf7';
-    saveButton.style.border = 'none';
-    saveButton.style.color = 'white';
-    saveButton.style.cursor = 'pointer';
+    saveButton.style.cssText = `
+        padding: 8px 16px !important;
+        border-radius: 4px !important;
+        background-color: #4dabf7 !important;
+        border: none !important;
+        color: white !important;
+        cursor: pointer !important;
+        font-size: 14px !important;
+    `;
     
     saveButton.addEventListener('click', () => {
         const settings = getPluginSettings();
@@ -1664,34 +1702,50 @@ function showSettingsPopup() {
         saveSettingsDebounced();
         loadConfig();
         
-        // 使用toastr显示成功消息（如果存在）
-        if (window.toastr) {
-            toastr.success('设置已保存！');
-        }
+        // 显示成功消息
+        const successMsg = document.createElement('div');
+        successMsg.textContent = '设置已保存！';
+        successMsg.style.cssText = `
+            color: #4cb944 !important;
+            text-align: center !important;
+            margin-top: 10px !important;
+        `;
+        buttonContainer.appendChild(successMsg);
         
-        // 关闭UI面板
-        if (overlay.parentElement) {
-            document.body.removeChild(overlay);
-        }
-        
-        if (settings.autoInstallButtons) {
-            document.querySelectorAll(`.${config.buttonClass}`).forEach(btn => btn.remove());
-            installScreenshotButtons();
-        } else {
-            document.querySelectorAll(`.${config.buttonClass}`).forEach(btn => btn.remove());
-        }
+        // 3秒后关闭
+        setTimeout(() => {
+            if (overlay.parentElement) {
+                document.body.removeChild(overlay);
+            }
+            
+            if (settings.autoInstallButtons) {
+                document.querySelectorAll(`.${config.buttonClass}`).forEach(btn => btn.remove());
+                installScreenshotButtons();
+            } else {
+                document.querySelectorAll(`.${config.buttonClass}`).forEach(btn => btn.remove());
+            }
+        }, 1500);
     });
     
     buttonContainer.appendChild(saveButton);
     popup.appendChild(buttonContainer);
     
-    // 添加到DOM并绑定事件
+    // 添加到DOM
     overlay.appendChild(popup);
     document.body.appendChild(overlay);
     
     // 点击遮罩层关闭
     overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) document.body.removeChild(overlay);
+        if (e.target === overlay) {
+            document.body.removeChild(overlay);
+        }
+    });
+    
+    // 输出调试信息到控制台
+    console.log('[html2canvas-pro] 弹窗尺寸:', {
+        viewport: `${window.innerWidth}x${window.innerHeight}`,
+        overlay: `${overlay.offsetWidth}x${overlay.offsetHeight}`,
+        popup: `${popup.offsetWidth}x${popup.offsetHeight}`
     });
 }
 
