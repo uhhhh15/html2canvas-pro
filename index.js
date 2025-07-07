@@ -1,4 +1,4 @@
-// public/extensions/third-party/scane/index.js
+// public/extensions/third-party/html2canvas-pro/index.js
 
 import {
     extension_settings,
@@ -75,7 +75,7 @@ const defaultSettings = {
     scrollDelay: 10,
     autoInstallButtons: true,
     altButtonLocation: true,
-    screenshotScale: 2.0,      // 降低到 1.0 以提高速度
+    screenshotScale: 1.5,      // 降低到 1.5 以提高速度
     useForeignObjectRendering: false,
     letterRendering: true,    // 关闭字形渲染提高文字渲染速度
     imageTimeout: 3000,        // 缩短图像加载超时
@@ -154,17 +154,40 @@ function loadConfig() {
     config.altButtonLocation = settings.altButtonLocation;
     config.debugOverlay = settings.debugOverlay !== undefined ? settings.debugOverlay : true;
 
-    // 将所有html2canvas相关设置正确地应用到 html2canvasOptions
-    const loadedScale = parseFloat(settings.screenshotScale);
-    if (!isNaN(loadedScale) && loadedScale > 0) {
+    // --- 【增强日志与强制修正】处理 screenshotScale ---
+    captureLogger.info('[配置] 开始处理 screenshotScale 设置');
+
+    const rawSavedScale = settings.screenshotScale;
+    const loadedScale = parseFloat(rawSavedScale);
+    
+    captureLogger.debug(`[配置] 从设置中读取到的原始 scale 值为: ${rawSavedScale} (类型: ${typeof rawSavedScale})`);
+    
+    // 场景 1: 读取到的值是旧的默认值 2.0
+    if (!isNaN(loadedScale) && loadedScale === 2.0) {
+        settings.screenshotScale = 1.5; // 更新设置对象中的值
+        config.html2canvasOptions.scale = 1.5; // 同时更新当前配置
+        
+        captureLogger.warn(`[配置] 检测到旧的默认 scale 值 (2.0)，已自动修正为新的默认值 1.5。`);
+        // 可选：如果 saveSettingsDebounced 可靠，可以调用它来保存修正
+        if (typeof saveSettingsDebounced === 'function') {
+            saveSettingsDebounced();
+        }
+    } 
+    // 场景 2: 读取到的值是有效的自定义值 (不是 2.0)
+    else if (!isNaN(loadedScale) && loadedScale > 0) {
         config.html2canvasOptions.scale = loadedScale;
-    } else {
-        config.html2canvasOptions.scale = defaultSettings.screenshotScale;
+        captureLogger.info(`[配置] 已加载用户自定义的 scale 值: ${loadedScale}`);
+    } 
+    // 场景 3: 读取到的值无效或不存在，应用新的默认值
+    else {
+        settings.screenshotScale = 1.5;
+        config.html2canvasOptions.scale = 1.5;
+        captureLogger.info(`[配置] 未找到有效的 scale 值，已应用新的默认值 1.5。`);
     }
 
-    // 添加调试输出
-    console.log('DEBUG: html2canvas配置加载', config.html2canvasOptions);
-
+    // 最终确认
+    captureLogger.success(`[配置] screenshotScale 最终生效值为: ${config.html2canvasOptions.scale}`);
+    
     // 应用其他html2canvas设置
     config.html2canvasOptions.foreignObjectRendering = settings.useForeignObjectRendering;
     config.html2canvasOptions.letterRendering = settings.letterRendering !== undefined ?
@@ -174,9 +197,10 @@ function loadConfig() {
     // 加载图片格式设置
     config.imageFormat = settings.imageFormat || defaultSettings.imageFormat;
 
-    console.log(`${PLUGIN_NAME}: 配置已加载并应用:`, config);
+    // 最终打印一次完整的配置信息
+    console.log(`${PLUGIN_NAME}: 配置已加载并应用:`, { ...config });
+    captureLogger.info(`[配置] 插件配置加载完成`, { ...config });
 }
-
 // === 动态加载脚本的辅助函数 (保持在 jQuery 闭包外部) ===
 async function loadScript(src) {
     return new Promise((resolve, reject) => {
@@ -785,10 +809,11 @@ async function handleIframesAsync(clonedElement, originalDocument) {
     await Promise.all(promises);
 }
 
-// ### FIX 2 of 3: Removed container padding and negative offset to perfectly frame the content ###
+// [最终修复版 - 完整无缺]
 async function captureElementWithHtml2Canvas(elementToCapture, h2cUserOptions = {}) {
     // 每次截图前清除上一轮日志
     captureLogger.clear();
+	captureLogger.info(`[单元素截图] 使用的配置`, { scale: config.html2canvasOptions.scale, format: config.imageFormat });
     captureLogger.info(`[单元素截图] 启动截图流程`, {
         元素: elementToCapture?.tagName,
         类名: elementToCapture?.className,
@@ -816,25 +841,14 @@ async function captureElementWithHtml2Canvas(elementToCapture, h2cUserOptions = 
         captureLogger.debug(`[单元素截图] 元素尺寸测量`, {
             宽度: contentWidth,
             高度: contentHeight,
-            计算样式: {
-                可见性: computedStyle.visibility,
-                显示: computedStyle.display,
-                定位: computedStyle.position,
-                溢出: computedStyle.overflow,
-                zIndex: computedStyle.zIndex
-            }
+            计算样式: { 可见性: computedStyle.visibility, 显示: computedStyle.display, 定位: computedStyle.position, 溢出: computedStyle.overflow, zIndex: computedStyle.zIndex }
         });
         
         if (contentWidth === 0) {
             captureLogger.critical(`[单元素截图] 无法测量内容宽度，元素可能不可见`, {
-                可见性: computedStyle.visibility,
-                显示: computedStyle.display,
-                位置: computedStyle.position,
-                元素HTML: elementToCapture.outerHTML.substring(0, 200) + '...',
-                父元素可见性: elementToCapture.parentElement ? 
-                    window.getComputedStyle(elementToCapture.parentElement).visibility : 'N/A',
-                父元素显示: elementToCapture.parentElement ? 
-                    window.getComputedStyle(elementToCapture.parentElement).display : 'N/A'
+                可见性: computedStyle.visibility, 显示: computedStyle.display, 位置: computedStyle.position, 元素HTML: elementToCapture.outerHTML.substring(0, 200) + '...',
+                父元素可见性: elementToCapture.parentElement ? window.getComputedStyle(elementToCapture.parentElement).visibility : 'N/A',
+                父元素显示: elementToCapture.parentElement ? window.getComputedStyle(elementToCapture.parentElement).display : 'N/A'
             });
             throw new Error("无法测量消息内容宽度，元素可能不可见。");
         }
@@ -845,193 +859,155 @@ async function captureElementWithHtml2Canvas(elementToCapture, h2cUserOptions = 
             throw new Error("无法准备截图元素");
         }
 
-        // =================================================================
-        // ✨✨✨ 【决定性修复】 ✨✨✨
-        // 问题的根源是克隆出的 .mes 根元素丢失了其 display:flex 属性。
-        // `prepareSingleElementForHtml2CanvasPro` 只复制了部分基础样式。
-        // 我们必须在这里，直接对克隆出的根元素本身调用我们最强的样式复制函数，
-        // 以确保其作为 Flex 容器的布局属性被完整地继承过来。
         captureLogger.info('[布局修复-根元素] 开始修复根元素Flexbox布局...');
         copyComputedStyles(elementToCapture, preparedElement, 'root-clone');
-        // 重新强制宽度，因为 copyComputedStyles 可能会覆盖它
         preparedElement.style.width = `${contentWidth}px`; 
         captureLogger.success('[布局修复-根元素] 根元素布局已修复。');
-        // =================================================================
-
 
         if (overlay) updateOverlay(overlay, '获取并构建背景...', 0.15);
         const background = await getDynamicBackground(elementToCapture);
         captureLogger.debug(`[单元素截图] 背景信息`, {
             背景色: background.color,
-            图片信息: background.imageInfo ? {
-                URL: background.imageInfo.url.substring(0, 100) + '...',
-                宽度: background.imageInfo.originalWidth,
-                高度: background.imageInfo.originalHeight,
-                背景大小: background.imageInfo.styles.backgroundSize,
-                背景重复: background.imageInfo.styles.backgroundRepeat
-            } : '无背景图'
+            图片信息: background.imageInfo ? { URL: background.imageInfo.url.substring(0, 100) + '...', 宽度: background.imageInfo.originalWidth, 高度: background.imageInfo.originalHeight, 背景大小: background.imageInfo.styles.backgroundSize, 背景重复: background.imageInfo.styles.backgroundRepeat } : '无背景图'
         });
-
-        captureLogger.debug(`[单元素截图] 创建临时容器前`, {
-            内容宽度: contentWidth,
-            预处理元素宽度: preparedElement.style.width,
-            预处理元素高度: preparedElement.style.height
-        });
-
+        
+        // --- 核心变化 1：将临时容器背景设为透明，为手动合成做准备 ---
         Object.assign(tempContainer.style, {
             position: 'absolute',
             left: '-9999px',
             top: '0px',
             width: `${contentWidth}px`,
             padding: '0', 
-            backgroundColor: background.color,
+            backgroundColor: 'transparent', // **重要**：不再设置背景色和背景图
             overflow: 'visible',
         });
-
-        if (background.imageInfo) {
-            Object.assign(tempContainer.style, background.imageInfo.styles);
-        }
-        
-        captureLogger.debug(`[单元素截图] 添加元素到临时容器前`, {
-            tempContainer宽度: tempContainer.style.width,
-            tempContainer背景: tempContainer.style.backgroundColor,
-            preparedElement子元素数: preparedElement.children.length,
-            preparedElement宽度: preparedElement.offsetWidth || preparedElement.style.width
-        });
+        // 不再执行: if (background.imageInfo) { Object.assign(...) }
 
         tempContainer.appendChild(preparedElement);
         document.body.appendChild(tempContainer);
         
-        const tempContainerComputedStyle = window.getComputedStyle(tempContainer);
         captureLogger.debug(`[单元素截图] 临时容器已创建并添加到DOM`, {
-            计算宽度: tempContainer.offsetWidth,
-            计算高度: tempContainer.offsetHeight,
-            样式宽度: tempContainerComputedStyle.width,
-            内容HTML长度: tempContainer.innerHTML.length,
-            子元素数: tempContainer.children.length,
-            子元素宽度: tempContainer.children[0]?.offsetWidth || 0,
-            子元素高度: tempContainer.children[0]?.offsetHeight || 0,
-            tempContainer位置: `${tempContainer.offsetLeft},${tempContainer.offsetTop}`,
-            tempContainer可见性: tempContainerComputedStyle.visibility,
-            tempContainer显示模式: tempContainerComputedStyle.display
+            计算宽度: tempContainer.offsetWidth, 计算高度: tempContainer.offsetHeight, 内容HTML长度: tempContainer.innerHTML.length,
         });
 
         if (tempContainer.innerHTML.length < 10 || !tempContainer.children.length) {
-            captureLogger.critical(`[单元素截图] 临时容器似乎是空的或内容异常短`, {
-                innerHTML: tempContainer.innerHTML,
-                子元素数: tempContainer.children.length
-            });
+            captureLogger.critical(`[单元素截图] 临时容器似乎是空的或内容异常短`);
         }
-
+        
+        // 保持布局修复和iframe处理不变
         try {
             captureLogger.info('[布局修复-后代] 开始修复复杂布局...');
-            const selectorsToFix = [
-                // 现在根元素已修复，我们只需关注其内部需要特殊处理的后代元素
-                '.mesAvatarWrapper', 
-                '.ch_name.flex-container.justifySpaceBetween',
-                '.flex-container.alignItemsBaseline'
-            ];
+            const selectorsToFix = ['.mesAvatarWrapper', '.ch_name.flex-container.justifySpaceBetween', '.flex-container.alignItemsBaseline'];
             fixComplexLayouts(elementToCapture, preparedElement, selectorsToFix);
             captureLogger.success('[布局修复-后代] 复杂布局修复完成。');
         } catch (error) {
             captureLogger.error('[布局修复-后代] 修复过程中发生错误', error);
         }
-
         if (overlay) updateOverlay(overlay, '正在处理内联框架(iframe)...', 0.25);
         await handleIframesAsync(tempContainer, elementToCapture.ownerDocument);
-        
         await new Promise(resolve => setTimeout(resolve, Math.max(100, config.screenshotDelay)));
         captureLogger.info(`[单元素截图] 延迟${Math.max(100, config.screenshotDelay)}ms后继续`);
 
-        if (overlay) updateOverlay(overlay, '正在渲染场景...', 0.4);
+        if (overlay) updateOverlay(overlay, '正在渲染场景(内容层)...', 0.4);
         
+        // --- 核心变化 2：准备渲染内容层（透明背景） ---
         const finalOptions = {
             ...config.html2canvasOptions,
-            backgroundColor: null,
+            backgroundColor: null, // 强制html2canvas使用透明背景
         };
         
-        captureLogger.info(`[单元素截图] 开始调用html2canvas渲染`, {
-            容器尺寸: `${tempContainer.offsetWidth}x${tempContainer.offsetHeight}px`,
-            容器位置: `${tempContainer.offsetLeft},${tempContainer.offsetTop}`,
-            选项: finalOptions,
-            scale: finalOptions.scale || 1,
-            可见性: window.getComputedStyle(tempContainer).visibility,
-            父元素可见性: tempContainer.parentElement ? 
-                window.getComputedStyle(tempContainer.parentElement).visibility : 'N/A'
-        });
-
-        const finalCanvas = await html2canvas(tempContainer, {
+        captureLogger.info(`[单元素截图] 开始调用html2canvas渲染 (透明背景模式)`);
+        
+        // **渲染内容层画布，保持所有原有选项**
+        const contentCanvas = await html2canvas(tempContainer, {
             ...finalOptions,
-            ignoreElements: (element) => {
+            ignoreElements: (element) => { // **保留了 ignoreElements**
                 const classList = element.classList;
                 if (!classList) return false;
-                if (classList.contains('swipeRightBlock') || 
-                    classList.contains('swipe_left') ||
-                    classList.contains('st-capture-overlay') ||
-                    element.id === 'top-settings-holder' ||
-                    element.id === 'form_sheld') {
+                if (classList.contains('swipeRightBlock') || classList.contains('swipe_left') || classList.contains('st-capture-overlay') || element.id === 'top-settings-holder' || element.id === 'form_sheld') {
                     return true;
                 }
                 return false;
             },
 			
-            onclone: (documentClone, element) => {
-                captureLogger.debug(`[单元素截图] html2canvas克隆完成回调`, {
-                    克隆元素宽度: element.offsetWidth,
-                    克隆元素高度: element.offsetHeight,
-                });
-                
+            onclone: (documentClone, element) => { // **保留了 onclone**
+                captureLogger.debug(`[单元素截图] html2canvas克隆完成回调`, { 克隆元素宽度: element.offsetWidth, 克隆元素高度: element.offsetHeight });
                 captureLogger.debug(`[h2c onclone] 开始强制移除 <summary> 的列表标记...`);
                 try {
                     const clonedSummaries = Array.from(documentClone.querySelectorAll('summary'));
                     clonedSummaries.forEach((cloneSummary, index) => {
                         cloneSummary.style.setProperty('list-style', 'none', 'important');
+                        // 保留原始的详细日志记录
                         captureLogger.success(`[h2c onclone] 已为第 ${index + 1} 个 <summary> 移除列表标记。`);
                     });
                 } catch(e) {
                     captureLogger.error(`[h2c onclone] 移除 <summary> 标记时发生错误`, e);
                 }
-                
                 return element;
             },
         });
         
-        captureLogger.info(`[单元素截图] html2canvas渲染完成`, {
-            canvas宽: finalCanvas.width,
-            canvas高: finalCanvas.height,
-            canvas类型: finalCanvas.constructor.name
-        });
-        
-        if (finalCanvas.width === 0 || finalCanvas.height === 0) {
-            captureLogger.critical(`[单元素截图] 生成的Canvas尺寸为0！截图将是空白的`, {
-                canvas宽: finalCanvas.width,
-                canvas高: finalCanvas.height
-            });
+        captureLogger.info(`[单元素截图] 内容层渲染完成`, { canvas宽: contentCanvas.width, canvas高: contentCanvas.height });
+        if (contentCanvas.width === 0 || contentCanvas.height === 0) {
+            captureLogger.critical(`[单元素截图] 生成的Canvas尺寸为0！截图将是空白的`);
         }
         
-        if (overlay) updateOverlay(overlay, '生成最终图像...', 0.9);
+        // --- 核心变化 3：手动合成最终图像 ---
+        if (overlay) updateOverlay(overlay, '手动合成最终图像...', 0.8);
+
+        const finalCanvas = document.createElement('canvas');
+        finalCanvas.width = contentCanvas.width;
+        finalCanvas.height = contentCanvas.height;
+        const ctx = finalCanvas.getContext('2d');
+        
+        // 步骤 A: 填充纯色背景
+        ctx.fillStyle = background.color;
+        ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
+
+        // 步骤 B: 绘制平铺背景图
+        if (background.imageInfo) {
+            const bgImage = new Image();
+            bgImage.crossOrigin = 'anonymous';
+            await new Promise((resolve, reject) => {
+                bgImage.onload = resolve;
+                bgImage.onerror = reject;
+                bgImage.src = background.imageInfo.url;
+            });
+            const pattern = ctx.createPattern(bgImage, 'repeat-y');
+            ctx.fillStyle = pattern;
+            const scale = finalOptions.scale || 1;
+            const elementRect = elementToCapture.getBoundingClientRect();
+            const bgContextElement = document.querySelector('#bg1, #bg2') || document.querySelector(config.chatContentSelector);
+            const bgRect = bgContextElement.getBoundingClientRect();
+            const offsetX = (elementRect.left - bgRect.left) * scale;
+            const offsetY = (elementRect.top - bgRect.top) * scale;
+            ctx.save();
+            ctx.translate(-offsetX, -offsetY);
+            ctx.fillRect(offsetX, offsetY, finalCanvas.width, finalCanvas.height);
+            ctx.restore();
+        }
+
+        // 步骤 C: 将内容层绘制到背景之上
+        ctx.drawImage(contentCanvas, 0, 0);
+
+        if (overlay) updateOverlay(overlay, '生成最终图像数据...', 0.9);
         const startTime = performance.now();
         if (config.imageFormat === 'jpg') {
-            finalDataUrl = finalCanvas.toDataURL('image/jpeg', 1.0);
+            finalDataUrl = finalCanvas.toDataURL('image/jpeg', 0.8);
         } else {
             finalDataUrl = finalCanvas.toDataURL('image/png');
         }
         const endTime = performance.now();
 
+        // **保留了所有详细的 DataURL 日志记录**
         if (finalDataUrl) {
             const dataUrlLength = finalDataUrl.length;
             captureLogger.debug(`[单元素截图] 数据URL生成完成`, {
-                格式: config.imageFormat,
-                生成耗时: `${(endTime - startTime).toFixed(2)}ms`,
-                URL长度: dataUrlLength,
-                URL前缀: finalDataUrl.substring(0, 50) + '...',
-                URL结尾: '...' + finalDataUrl.substring(finalDataUrl.length - 20)
+                格式: config.imageFormat, 生成耗时: `${(endTime - startTime).toFixed(2)}ms`, URL长度: dataUrlLength,
+                URL前缀: finalDataUrl.substring(0, 50) + '...', URL结尾: '...' + finalDataUrl.substring(finalDataUrl.length - 20)
             });
-            
             if (dataUrlLength < 1000) {
-                captureLogger.critical(`[单元素截图] 生成的数据URL异常短 (${dataUrlLength}字节)，可能是空白或黑屏图像`, {
-                    data_url_前50字符: finalDataUrl.substring(0, 50)
-                });
+                captureLogger.critical(`[单元素截图] 生成的数据URL异常短 (${dataUrlLength}字节)，可能是空白或黑屏图像`);
             } else {
                 captureLogger.success(`[单元素截图] 成功生成图像数据URL (${dataUrlLength}字节)`);
             }
@@ -1042,16 +1018,15 @@ async function captureElementWithHtml2Canvas(elementToCapture, h2cUserOptions = 
         if (overlay) updateOverlay(overlay, `渲染错误: ${error.message?.substring(0, 60)}...`, 0);
         throw error;
     } finally {
+        // **保留了完整的 finally 清理逻辑**
         if (tempContainer.parentElement) {
             tempContainer.parentElement.removeChild(tempContainer);
             captureLogger.debug(`[单元素截图] 临时容器已从DOM移除`);
-			
-        const pseudoStyleTag = document.getElementById('h2c-pseudo-styles');
-        if (pseudoStyleTag) {
-            pseudoStyleTag.remove();
-            captureLogger.debug(`[单元素截图] 伪元素样式表已清理`);
-        }
-			
+            const pseudoStyleTag = document.getElementById('h2c-pseudo-styles');
+            if (pseudoStyleTag) {
+                pseudoStyleTag.remove();
+                captureLogger.debug(`[单元素截图] 伪元素样式表已清理`);
+            }
         }
         if (overlay?.parentElement) {
             const delay = finalDataUrl ? 1200 : 3000;
@@ -1185,7 +1160,7 @@ async function captureMultipleMessagesWithHtml2Canvas(messagesToCapture, actionH
 		
         updateOverlay(overlay, '生成图像数据...', 0.8);
         if (config.imageFormat === 'jpg') {
-            dataUrl = canvas.toDataURL('image/jpeg', 1.0);
+            dataUrl = canvas.toDataURL('image/jpeg', 0.8);
         } else {
             dataUrl = canvas.toDataURL('image/png');
         }
@@ -1609,40 +1584,13 @@ function downloadImage(dataUrl, messageElement = null, typeHint = 'screenshot') 
     captureLogger.debug(`[下载-追踪] 函数入口验证通过，dataUrl 长度: ${dataUrl.length}`);
     
     const link = document.createElement('a');
-    let filename;
-
-    if (messageElement && typeof messageElement.querySelector === 'function') {
-        const nameSelector = config.messageHeaderSelector + ' .name_text';
-        const nameFallbackSelector = config.messageHeaderSelector;
-        const nameTextElement = messageElement.querySelector(nameSelector) || messageElement.querySelector(nameFallbackSelector);
-        
-        let senderName = 'Character';
-        if (nameTextElement && nameTextElement.textContent && nameTextElement.textContent.trim()) {
-            senderName = nameTextElement.textContent.trim();
-        }
-        
-        const isUser = messageElement.classList.contains('user_mes') || (messageElement.closest && messageElement.closest('.user_mes'));
-        const sender = isUser ? 'User' : senderName;
-
-        const msgIdData = messageElement.getAttribute('mesid') || messageElement.dataset.msgId || messageElement.id;
-        const msgId = msgIdData ? msgIdData.slice(-5) : ('m' + Date.now().toString().slice(-8, -4));
-
-        const timestampAttr = messageElement.dataset.timestamp || messageElement.getAttribute('data-timestamp') || new Date().toISOString();
-        const timestamp = timestampAttr.replace(/[:\sTZ.]/g, '_').replace(/__+/g, '_');
-
-        // 【核心修复 & 最终方案】
-        const illegalRe = /[^\p{L}\p{N}\s_-]/gu; 
-        let filenameSafeSender = sender.replace(illegalRe, '_');
-        filenameSafeSender = filenameSafeSender.replace(/[\s_]+/g, '_').substring(0, 30);
-
-        filename = `SillyTavern_${filenameSafeSender}_${msgId}_${timestamp}`;
-        
-    } else {
-        filename = `SillyTavern_${typeHint.replace(/[^a-z0-9_-]/gi, '_')}_${new Date().toISOString().replace(/[:.TZ]/g, '-')}`;
-    }
-
+	
+    const now = new Date();
+    const timestamp = now.toISOString().replace(/[:.T-]/g, '').slice(0, 14); // 生成 YYYYMMDDHHMMSS 格式
     const fileExtension = config.imageFormat || 'jpg';
-    link.download = `${filename}.${fileExtension}`;
+    const filename = `SillyTavern_${timestamp}.${fileExtension}`;
+    
+    link.download = filename;
     link.href = dataUrl;
     
     // --- 日志追踪 2: 确认文件名和链接属性 ---
