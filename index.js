@@ -845,6 +845,20 @@ async function captureElementWithHtml2Canvas(elementToCapture, h2cUserOptions = 
             throw new Error("无法准备截图元素");
         }
 
+        // =================================================================
+        // ✨✨✨ 【决定性修复】 ✨✨✨
+        // 问题的根源是克隆出的 .mes 根元素丢失了其 display:flex 属性。
+        // `prepareSingleElementForHtml2CanvasPro` 只复制了部分基础样式。
+        // 我们必须在这里，直接对克隆出的根元素本身调用我们最强的样式复制函数，
+        // 以确保其作为 Flex 容器的布局属性被完整地继承过来。
+        captureLogger.info('[布局修复-根元素] 开始修复根元素Flexbox布局...');
+        copyComputedStyles(elementToCapture, preparedElement, 'root-clone');
+        // 重新强制宽度，因为 copyComputedStyles 可能会覆盖它
+        preparedElement.style.width = `${contentWidth}px`; 
+        captureLogger.success('[布局修复-根元素] 根元素布局已修复。');
+        // =================================================================
+
+
         if (overlay) updateOverlay(overlay, '获取并构建背景...', 0.15);
         const background = await getDynamicBackground(elementToCapture);
         captureLogger.debug(`[单元素截图] 背景信息`, {
@@ -858,7 +872,6 @@ async function captureElementWithHtml2Canvas(elementToCapture, h2cUserOptions = 
             } : '无背景图'
         });
 
-        // 记录tempContainer创建前的状态
         captureLogger.debug(`[单元素截图] 创建临时容器前`, {
             内容宽度: contentWidth,
             预处理元素宽度: preparedElement.style.width,
@@ -879,7 +892,6 @@ async function captureElementWithHtml2Canvas(elementToCapture, h2cUserOptions = 
             Object.assign(tempContainer.style, background.imageInfo.styles);
         }
         
-        // 记录preparedElement添加到容器前的状态
         captureLogger.debug(`[单元素截图] 添加元素到临时容器前`, {
             tempContainer宽度: tempContainer.style.width,
             tempContainer背景: tempContainer.style.backgroundColor,
@@ -890,7 +902,6 @@ async function captureElementWithHtml2Canvas(elementToCapture, h2cUserOptions = 
         tempContainer.appendChild(preparedElement);
         document.body.appendChild(tempContainer);
         
-        // 记录添加到DOM后的状态
         const tempContainerComputedStyle = window.getComputedStyle(tempContainer);
         captureLogger.debug(`[单元素截图] 临时容器已创建并添加到DOM`, {
             计算宽度: tempContainer.offsetWidth,
@@ -905,7 +916,6 @@ async function captureElementWithHtml2Canvas(elementToCapture, h2cUserOptions = 
             tempContainer显示模式: tempContainerComputedStyle.display
         });
 
-        // 检查临时容器是否真正包含了内容
         if (tempContainer.innerHTML.length < 10 || !tempContainer.children.length) {
             captureLogger.critical(`[单元素截图] 临时容器似乎是空的或内容异常短`, {
                 innerHTML: tempContainer.innerHTML,
@@ -914,29 +924,17 @@ async function captureElementWithHtml2Canvas(elementToCapture, h2cUserOptions = 
         }
 
         try {
-            captureLogger.info('[布局修复] 开始修复复杂布局...');
-            
-            // 定义需要修复的选择器
+            captureLogger.info('[布局修复-后代] 开始修复复杂布局...');
             const selectorsToFix = [
-                // *** ✨✨✨ 核心修复 ✨✨✨ ***
-                // 必须修复 .mes 容器本身，因为它负责建立 Flexbox 布局，
-                // 从而使头像(.mesAvatarWrapper)和消息块(.mes_block)水平排列。
-                '.mes',
-                // *** ✨✨✨ 修复结束 ✨✨✨ ***
+                // 现在根元素已修复，我们只需关注其内部需要特殊处理的后代元素
                 '.mesAvatarWrapper', 
                 '.ch_name.flex-container.justifySpaceBetween',
-                // 新增：修复消息头中基于基线对齐的Flex容器，解决姓名、时间戳和图标的错位问题
                 '.flex-container.alignItemsBaseline'
             ];
-            
-            // 注意这里的参数：
-            // originalElement: elementToCapture (原始的，用于测量)
-            // clonedElement: preparedElement (克隆的，用于应用样式)
             fixComplexLayouts(elementToCapture, preparedElement, selectorsToFix);
-            
-            captureLogger.success('[布局修复] 复杂布局修复完成。');
+            captureLogger.success('[布局修复-后代] 复杂布局修复完成。');
         } catch (error) {
-            captureLogger.error('[布局修复] 修复过程中发生错误', error);
+            captureLogger.error('[布局修复-后代] 修复过程中发生错误', error);
         }
 
         if (overlay) updateOverlay(overlay, '正在处理内联框架(iframe)...', 0.25);
@@ -947,11 +945,9 @@ async function captureElementWithHtml2Canvas(elementToCapture, h2cUserOptions = 
 
         if (overlay) updateOverlay(overlay, '正在渲染场景...', 0.4);
         
-        // 详细记录html2canvas配置
         const finalOptions = {
             ...config.html2canvasOptions,
             backgroundColor: null,
-            // 其他配置
         };
         
         captureLogger.info(`[单元素截图] 开始调用html2canvas渲染`, {
@@ -980,19 +976,15 @@ async function captureElementWithHtml2Canvas(elementToCapture, h2cUserOptions = 
             },
 			
             onclone: (documentClone, element) => {
-                // --- 原有的日志记录逻辑 ---
                 captureLogger.debug(`[单元素截图] html2canvas克隆完成回调`, {
                     克隆元素宽度: element.offsetWidth,
                     克隆元素高度: element.offsetHeight,
                 });
                 
-                // --- 【最终方案】强制移除所有列表样式，杜绝 "1." 标记 ---
                 captureLogger.debug(`[h2c onclone] 开始强制移除 <summary> 的列表标记...`);
                 try {
                     const clonedSummaries = Array.from(documentClone.querySelectorAll('summary'));
-
                     clonedSummaries.forEach((cloneSummary, index) => {
-                        // 强制设置 list-style 为 none，并使用 !important 确保最高优先级
                         cloneSummary.style.setProperty('list-style', 'none', 'important');
                         captureLogger.success(`[h2c onclone] 已为第 ${index + 1} 个 <summary> 移除列表标记。`);
                     });
@@ -1000,7 +992,6 @@ async function captureElementWithHtml2Canvas(elementToCapture, h2cUserOptions = 
                     captureLogger.error(`[h2c onclone] 移除 <summary> 标记时发生错误`, e);
                 }
                 
-                // --- 必须返回克隆的元素 ---
                 return element;
             },
         });
@@ -1019,7 +1010,6 @@ async function captureElementWithHtml2Canvas(elementToCapture, h2cUserOptions = 
         }
         
         if (overlay) updateOverlay(overlay, '生成最终图像...', 0.9);
-        // 根据设置选择图片格式
         const startTime = performance.now();
         if (config.imageFormat === 'jpg') {
             finalDataUrl = finalCanvas.toDataURL('image/jpeg', 1.0);
@@ -1029,7 +1019,6 @@ async function captureElementWithHtml2Canvas(elementToCapture, h2cUserOptions = 
         const endTime = performance.now();
 
         if (finalDataUrl) {
-            // 检查dataUrl是否正常
             const dataUrlLength = finalDataUrl.length;
             captureLogger.debug(`[单元素截图] 数据URL生成完成`, {
                 格式: config.imageFormat,
@@ -1057,7 +1046,6 @@ async function captureElementWithHtml2Canvas(elementToCapture, h2cUserOptions = 
             tempContainer.parentElement.removeChild(tempContainer);
             captureLogger.debug(`[单元素截图] 临时容器已从DOM移除`);
 			
-        // --- 新增代码：清理伪元素样式表 ---
         const pseudoStyleTag = document.getElementById('h2c-pseudo-styles');
         if (pseudoStyleTag) {
             pseudoStyleTag.remove();
@@ -1100,13 +1088,12 @@ async function captureMultipleMessagesWithHtml2Canvas(messagesToCapture, actionH
         tempContainer.style.position = 'absolute';
         tempContainer.style.left = '-9999px';
         tempContainer.style.top = '-9999px';
-        // ### FIX: Removed padding to eliminate unwanted margins.
         tempContainer.style.padding = '0';
         tempContainer.style.overflow = 'visible';
 
         const firstMessage = messagesToCapture[0];
-        const containerWidth = firstMessage.offsetWidth + 'px';
-        tempContainer.style.width = containerWidth;
+        const containerWidth = firstMessage.offsetWidth;
+        tempContainer.style.width = containerWidth + 'px';
         
         updateOverlay(overlay, `正在准备背景...`, 0.02);
         const background = await getDynamicBackground(firstMessage);
@@ -1116,11 +1103,22 @@ async function captureMultipleMessagesWithHtml2Canvas(messagesToCapture, actionH
         }
 
         updateOverlay(overlay, `准备 ${messagesToCapture.length} 条消息...`, 0.05);
-        messagesToCapture.forEach(msg => {
+        
+        const preparedClones = [];
+        messagesToCapture.forEach((msg, index) => {
             try {
                 const preparedClone = prepareSingleElementForHtml2CanvasPro(msg);
                 if (preparedClone) {
+                    
+                    // =================================================================
+                    // ✨✨✨ 【决定性修复 - 多消息】 ✨✨✨
+                    // 对每一条被克隆的消息都执行同样的操作，确保它们各自的 Flexbox 布局正确。
+                    copyComputedStyles(msg, preparedClone, `multi-clone-${index}`);
+                    preparedClone.style.width = `${containerWidth}px`; // 统一所有消息宽度
+                    // =================================================================
+
                     tempContainer.appendChild(preparedClone);
+                    preparedClones.push(preparedClone); // 保存起来供后续使用
                 } else {
                      console.warn("Skipping null prepared clone for message:", msg);
                 }
@@ -1132,26 +1130,21 @@ async function captureMultipleMessagesWithHtml2Canvas(messagesToCapture, actionH
 		
         try {
             const selectorsToFix = [
-                // *** ✨✨✨ 核心修复 ✨✨✨ ***
-                // 同样修复 .mes 容器，确保每条消息的内部布局都正确
-                '.mes',
-                // *** ✨✨✨ 修复结束 ✨✨✨ ***
                 '.mesAvatarWrapper', 
                 '.ch_name.flex-container.justifySpaceBetween',
-                // 新增：修复消息头中基于基线对齐的Flex容器，解决姓名、时间戳和图标的错位问题
                 '.flex-container.alignItemsBaseline'
             ];
-            const clonedMessages = Array.from(tempContainer.children);
 
             messagesToCapture.forEach((originalMsg, index) => {
-                const clonedMsg = clonedMessages[index];
+                const clonedMsg = preparedClones[index]; // 使用我们保存的克隆体
                 if (originalMsg && clonedMsg) {
+                    // 对每条消息的后代元素进行修复
                     fixComplexLayouts(originalMsg, clonedMsg, selectorsToFix);
                 }
             });
-            captureLogger.success('[布局修复-多消息] 修复完成。');
+            captureLogger.success('[布局修复-多消息-后代] 修复完成。');
         } catch(error) {
-            captureLogger.error('[布局修复-多消息] 修复过程中发生错误', error);
+            captureLogger.error('[布局修复-多消息-后代] 修复过程中发生错误', error);
         }
         
         if (overlay) updateOverlay(overlay, '正在处理所有内联框架(iframe)...', 0.15);
@@ -1179,12 +1172,9 @@ async function captureMultipleMessagesWithHtml2Canvas(messagesToCapture, actionH
                 captureLogger.debug(`[h2c onclone - multi] 开始强制移除 <summary> 的列表标记...`);
                 try {
                     const clonedSummaries = Array.from(documentClone.querySelectorAll('summary'));
-
                     clonedSummaries.forEach((cloneSummary, index) => {
-                        // 同样，强制设置 list-style 为 none
                         cloneSummary.style.setProperty('list-style', 'none', 'important');
                     });
-                    
                     captureLogger.success(`[h2c onclone - multi] 已成功为 ${clonedSummaries.length} 个 <summary> 移除列表标记。`);
                 } catch(e) {
                     captureLogger.error(`[h2c onclone - multi] 移除 <summary> 标记时发生错误`, e);
@@ -1194,9 +1184,8 @@ async function captureMultipleMessagesWithHtml2Canvas(messagesToCapture, actionH
         });
 		
         updateOverlay(overlay, '生成图像数据...', 0.8);
-        // 根据设置选择图片格式
         if (config.imageFormat === 'jpg') {
-            dataUrl = canvas.toDataURL('image/jpeg', 1.0); // JPG格式质量为1.0
+            dataUrl = canvas.toDataURL('image/jpeg', 1.0);
         } else {
             dataUrl = canvas.toDataURL('image/png');
         }
@@ -1604,12 +1593,20 @@ async function captureMultipleMessagesFromContextMenu(currentMessageElement, act
     }
 }
 
+// 【最终解决方案 + 增强日志版】替换掉旧的 downloadImage 函数
 function downloadImage(dataUrl, messageElement = null, typeHint = 'screenshot') {
     captureLogger.info(`[下载] 准备下载图片: ${typeHint}`);
     
-    if (!dataUrl || dataUrl.length < 1000) {
-        captureLogger.critical(`[下载] 数据URL异常短或为空 (${dataUrl?.length || 0}字节)，可能是空白或黑屏图像`);
+    // --- 日志追踪 1: 确认入口 ---
+    if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) {
+        captureLogger.critical(`[下载-追踪] 函数入口验证失败，传入的 dataUrl 无效或格式错误。`, {
+            type: typeof dataUrl,
+            length: dataUrl?.length || 0,
+            prefix: dataUrl?.substring(0, 30) || 'N/A'
+        });
+        return; // 提前退出
     }
+    captureLogger.debug(`[下载-追踪] 函数入口验证通过，dataUrl 长度: ${dataUrl.length}`);
     
     const link = document.createElement('a');
     let filename;
@@ -1619,7 +1616,7 @@ function downloadImage(dataUrl, messageElement = null, typeHint = 'screenshot') 
         const nameFallbackSelector = config.messageHeaderSelector;
         const nameTextElement = messageElement.querySelector(nameSelector) || messageElement.querySelector(nameFallbackSelector);
         
-        let senderName = 'Character'; // 默认值
+        let senderName = 'Character';
         if (nameTextElement && nameTextElement.textContent && nameTextElement.textContent.trim()) {
             senderName = nameTextElement.textContent.trim();
         }
@@ -1633,24 +1630,25 @@ function downloadImage(dataUrl, messageElement = null, typeHint = 'screenshot') 
         const timestampAttr = messageElement.dataset.timestamp || messageElement.getAttribute('data-timestamp') || new Date().toISOString();
         const timestamp = timestampAttr.replace(/[:\sTZ.]/g, '_').replace(/__+/g, '_');
 
-        // ---【核心修复】---
-        // 使用“黑名单”替换非法字符，而不是“白名单”过滤。
-        // 这会保留中文、日文、俄文等各类语言的字符，只移除文件名中不允许的符号。
-        const illegalRe = /[\\/:*?"<>|]/g; 
-        const filenameSafeSender = sender.replace(illegalRe, '_').substring(0, 30); // 稍微放宽长度限制
+        // 【核心修复 & 最终方案】
+        const illegalRe = /[^\p{L}\p{N}\s_-]/gu; 
+        let filenameSafeSender = sender.replace(illegalRe, '_');
+        filenameSafeSender = filenameSafeSender.replace(/[\s_]+/g, '_').substring(0, 30);
 
         filename = `SillyTavern_${filenameSafeSender}_${msgId}_${timestamp}`;
         
-        captureLogger.debug(`[下载] 已生成文件名: ${filename}`);
     } else {
         filename = `SillyTavern_${typeHint.replace(/[^a-z0-9_-]/gi, '_')}_${new Date().toISOString().replace(/[:.TZ]/g, '-')}`;
-        captureLogger.debug(`[下载] 使用默认文件名: ${filename}`);
     }
 
     const fileExtension = config.imageFormat || 'jpg';
     link.download = `${filename}.${fileExtension}`;
     link.href = dataUrl;
     
+    // --- 日志追踪 2: 确认文件名和链接属性 ---
+    captureLogger.info(`[下载-追踪] 已生成净化后的文件名: "${link.download}"`);
+    captureLogger.debug(`[下载-追踪] <a> 链接的 href 属性已设置 (长度: ${link.href.length})`);
+
     const img = new Image();
     img.src = dataUrl;
     img.onload = () => {
@@ -1660,17 +1658,36 @@ function downloadImage(dataUrl, messageElement = null, typeHint = 'screenshot') 
             高度: img.height,
             数据URL长度: dataUrl.length
         });
-        
         if (img.width === 0 || img.height === 0) {
             captureLogger.critical(`[下载] 生成的图像宽度或高度为0，这是截图黑屏的确认`);
         }
     };
     
+    // --- 日志追踪 3: 追踪点击事件 ---
     try {
+        // 【健壮性改进】将链接临时添加到DOM中，以实现最大兼容性
+        document.body.appendChild(link);
+        captureLogger.debug('[下载-追踪] <a> 链接已临时添加到 document.body');
+
+        captureLogger.info('[下载-追踪] 即将执行 link.click()');
         link.click();
-        captureLogger.success(`[下载] 图像已开始下载: ${link.download}`);
+        captureLogger.success('[下载-追踪] link.click() 已执行，未抛出即时错误。浏览器现在应该处理下载。');
+        
+        // 清理
+        document.body.removeChild(link);
+        captureLogger.debug('[下载-追踪] 临时的 <a> 链接已从 document.body 移除');
+
     } catch (error) {
-        captureLogger.error(`[下载] 下载图像失败:`, error);
+        // --- 日志追踪 4: 捕获可能的同步错误 ---
+        captureLogger.critical('[下载-追踪] 在尝试触发下载时捕获到异常!', {
+            errorMessage: error.message,
+            errorStack: error.stack,
+            errorName: error.name
+        });
+        // 确保即使出错也清理
+        if (link.parentElement) {
+            document.body.removeChild(link);
+        }
     }
 }
 
