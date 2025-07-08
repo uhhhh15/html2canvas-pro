@@ -953,7 +953,7 @@ async function captureElementWithHtml2Canvas(elementToCapture, h2cUserOptions = 
         }
         
         // --- 核心变化 3：手动合成最终图像 ---
-        if (overlay) updateOverlay(overlay, '手动合成最终图像...', 0.8);
+        if (overlay) updateOverlay(overlay, '手动合成最终图像...', 0.9);
 
         const finalCanvas = document.createElement('canvas');
         finalCanvas.width = contentCanvas.width;
@@ -993,7 +993,7 @@ async function captureElementWithHtml2Canvas(elementToCapture, h2cUserOptions = 
         if (overlay) updateOverlay(overlay, '生成最终图像数据...', 0.9);
         const startTime = performance.now();
         if (config.imageFormat === 'jpg') {
-            finalDataUrl = finalCanvas.toDataURL('image/jpeg', 0.8);
+            finalDataUrl = finalCanvas.toDataURL('image/jpeg', 0.9);
         } else {
             finalDataUrl = finalCanvas.toDataURL('image/png');
         }
@@ -1158,9 +1158,9 @@ async function captureMultipleMessagesWithHtml2Canvas(messagesToCapture, actionH
             }
         });
 		
-        updateOverlay(overlay, '生成图像数据...', 0.8);
+        updateOverlay(overlay, '生成图像数据...', 0.9);
         if (config.imageFormat === 'jpg') {
-            dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            dataUrl = canvas.toDataURL('image/jpeg', 0.9);
         } else {
             dataUrl = canvas.toDataURL('image/png');
         }
