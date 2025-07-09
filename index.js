@@ -978,27 +978,43 @@ async function captureElementWithHtml2Canvas(elementToCapture, h2cUserOptions = 
         ctx.fillStyle = background.color;
         ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
 
-        // 步骤 B: 绘制平铺背景图
+        // 步骤 B: 绘制平铺背景图 (已修复错误处理)
         if (background.imageInfo) {
-            const bgImage = new Image();
-            bgImage.crossOrigin = 'anonymous';
-            await new Promise((resolve, reject) => {
-                bgImage.onload = resolve;
-                bgImage.onerror = reject;
-                bgImage.src = background.imageInfo.url;
-            });
-            const pattern = ctx.createPattern(bgImage, 'repeat-y');
-            ctx.fillStyle = pattern;
-            const scale = finalOptions.scale || 1;
-            const elementRect = elementToCapture.getBoundingClientRect();
-            const bgContextElement = document.querySelector('#bg1, #bg2') || document.querySelector(config.chatContentSelector);
-            const bgRect = bgContextElement.getBoundingClientRect();
-            const offsetX = (elementRect.left - bgRect.left) * scale;
-            const offsetY = (elementRect.top - bgRect.top) * scale;
-            ctx.save();
-            ctx.translate(-offsetX, -offsetY);
-            ctx.fillRect(offsetX, offsetY, finalCanvas.width, finalCanvas.height);
-            ctx.restore();
+            try {
+                const bgImage = new Image();
+                bgImage.crossOrigin = 'anonymous';
+
+                const imageLoaded = await new Promise((resolve) => {
+                    bgImage.onload = () => resolve(true); // 加载成功，返回 true
+                    bgImage.onerror = (err) => {
+                        // 在日志中记录具体错误，但不再中断流程
+                        captureLogger.warn('[背景合成] 背景图加载失败，将跳过绘制', { url: background.imageInfo.url, error: err });
+                        resolve(false); // 加载失败，返回 false
+                    };
+                    bgImage.src = background.imageInfo.url;
+                });
+
+                // 仅当图片成功加载后才进行绘制
+                if (imageLoaded) {
+                    captureLogger.debug('[背景合成] 背景图加载成功，开始绘制');
+                    const pattern = ctx.createPattern(bgImage, 'repeat-y');
+                    ctx.fillStyle = pattern;
+                    const scale = finalOptions.scale || 1;
+                    const elementRect = elementToCapture.getBoundingClientRect();
+                    const bgContextElement = document.querySelector('#bg1, #bg2') || document.querySelector(config.chatContentSelector);
+                    const bgRect = bgContextElement.getBoundingClientRect();
+                    const offsetX = (elementRect.left - bgRect.left) * scale;
+                    const offsetY = (elementRect.top - bgRect.top) * scale;
+                    ctx.save();
+                    ctx.translate(-offsetX, -offsetY);
+                    ctx.fillRect(offsetX, offsetY, finalCanvas.width, finalCanvas.height);
+                    ctx.restore();
+                }
+
+            } catch (e) {
+                // 添加一个额外的安全网，以防绘制过程中出现其他异常
+                captureLogger.error('[背景合成] 绘制背景图时发生意外错误', e);
+            }
         }
 
         // 步骤 C: 将内容层绘制到背景之上
