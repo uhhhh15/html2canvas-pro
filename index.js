@@ -252,35 +252,45 @@ async function getDynamicBackground(elementForContext) {
         if (bgImageUrlMatch) {
             const bgImageUrl = bgImageUrlMatch[1];
             
-            const img = new Image();
-            img.src = bgImageUrl;
-            await new Promise(resolve => {
-                img.onload = () => {
-                    captureLogger.debug(`[背景] 背景图加载成功: ${img.naturalWidth}x${img.naturalHeight}`);
-                    resolve();
-                };
-                img.onerror = () => {
-                    captureLogger.warn(`[背景] 背景图加载失败: ${bgImageUrl}`);
-                    resolve();
-                };
-            });
+            // --- 【核心修复】使用 Promise.race 并设置 500ms 超时 ---
+            try {
+                const imageLoadPromise = new Promise((resolve, reject) => {
+                    const img = new Image();
+                    img.onload = () => resolve(img);
+                    img.onerror = (err) => reject(new Error('Image failed to load from src'));
+                    img.src = bgImageUrl;
+                });
 
-            const elementRect = elementForContext.getBoundingClientRect();
-            const bgRect = bgElement.getBoundingClientRect();
-            const offsetX = elementRect.left - bgRect.left;
-            const offsetY = elementRect.top - bgRect.top;
+                const timeoutPromise = new Promise((_, reject) => {
+                    setTimeout(() => reject(new Error('Image load timed out after 500ms')), 500);
+                });
 
-            backgroundImageInfo = {
-                url: bgImageUrl,
-                originalWidth: img.naturalWidth || bgRect.width,
-                originalHeight: img.naturalHeight || bgRect.height,
-                styles: {
-                    backgroundImage: computedBgStyle.backgroundImage,
-                    backgroundSize: computedBgStyle.backgroundSize,
-                    backgroundRepeat: 'repeat-y', 
-                    backgroundPosition: `-${offsetX}px -${offsetY}px`,
-                }
-            };
+                const img = await Promise.race([imageLoadPromise, timeoutPromise]);
+
+                captureLogger.debug(`[背景] 背景图加载成功: ${img.naturalWidth}x${img.naturalHeight}`);
+                
+                const elementRect = elementForContext.getBoundingClientRect();
+                const bgRect = bgElement.getBoundingClientRect();
+                const offsetX = elementRect.left - bgRect.left;
+                const offsetY = elementRect.top - bgRect.top;
+
+                backgroundImageInfo = {
+                    url: bgImageUrl,
+                    originalWidth: img.naturalWidth || bgRect.width,
+                    originalHeight: img.naturalHeight || bgRect.height,
+                    styles: {
+                        backgroundImage: computedBgStyle.backgroundImage,
+                        backgroundSize: computedBgStyle.backgroundSize,
+                        backgroundRepeat: 'repeat-y', 
+                        backgroundPosition: `-${offsetX}px -${offsetY}px`,
+                    }
+                };
+            } catch (error) {
+                // 无论是加载失败还是超时，都会进入这里
+                captureLogger.error(`[背景] 无法处理背景图，将跳过: ${error.message}`);
+                backgroundImageInfo = null; // 确保在出错时 backgroundImageInfo 为 null，流程继续
+            }
+            // --- 修复结束 ---
         }
     } else {
         captureLogger.debug(`[背景] 没有检测到背景图`);
