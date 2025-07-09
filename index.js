@@ -582,7 +582,8 @@ function copyComputedStyles(source, target, cloneId) {
 
 
 /**
- * [增强版] 通过高保真复制计算样式来修复复杂布局。
+ * [增强修复版] 通过高保真复制计算样式来修复复杂布局。
+ * 此版本不再重新克隆子元素，而是在现有克隆体上工作，以保留准备阶段的成果。
  * @param {HTMLElement} originalElement - 原始元素
  * @param {HTMLElement} clonedElement - 克隆元素
  * @param {string[]} selectors - 需要修复的容器选择器数组
@@ -595,7 +596,7 @@ function fixComplexLayouts(originalElement, clonedElement, selectors) {
         const clonedContainers = clonedElement.querySelectorAll(selector);
 
         if (originalContainers.length !== clonedContainers.length) {
-            captureLogger.warn(`[布局修复] 选择器 "${selector}" 数量不匹配，跳过。`);
+            captureLogger.warn(`[布局修复] 选择器 "${selector}" 的原始与克隆数量不匹配，跳过。原始: ${originalContainers.length}, 克隆: ${clonedContainers.length}`);
             return;
         }
 
@@ -605,40 +606,53 @@ function fixComplexLayouts(originalElement, clonedElement, selectors) {
 
             captureLogger.debug(`[布局修复] 正在处理容器: ${originalContainer.className}`);
 
-            // 1. 复制容器本身的样式
+            // 1. 复制容器本身的样式 (保持不变)
             copyComputedStyles(originalContainer, clonedContainer, `container-${index}`);
             clonedContainer.style.width = `${originalContainer.offsetWidth}px`;
             clonedContainer.style.height = `${originalContainer.offsetHeight}px`;
             
-            // 2. 清空克隆容器的内部
-            clonedContainer.innerHTML = '';
+            // --- 核心逻辑变更：不再清空和重新克隆 ---
+            // clonedContainer.innerHTML = ''; // <-- 移除这一行
 
-            // 3. 遍历原始容器的子元素进行深度克隆
-            Array.from(originalContainer.children).forEach((originalChild, childIndex) => {
+            // 2. 遍历 *原始容器* 的直接子元素
+            Array.from(originalContainer.children).forEach((originalChild) => {
                 if (!(originalChild instanceof HTMLElement)) return;
 
-                // --- 新增逻辑：跳过指定的元素 ---
-                if (originalChild.matches('.mes_buttons')) {
-                    captureLogger.debug(`  > 已跳过 .mes_buttons 元素`);
-                    return; // 跳过 .mes_buttons 及其所有内容
+                // 3. 在 *克隆容器* 中找到对应的子元素
+                // 注意：这是一个简化的匹配，假设顺序和标签类型一致。
+                // 在SillyTavern的结构中，这通常是可靠的。
+                const correspondingClonedChild = Array.from(clonedContainer.children).find(
+                    cloneChild => cloneChild.className === originalChild.className && !cloneChild.dataset.styled
+                );
+
+                if (correspondingClonedChild) {
+                    // --- 新增逻辑：跳过已被移除的元素 ---
+                    if (originalChild.matches('.mes_buttons')) {
+                        captureLogger.debug(`  > 已跳过 .mes_buttons 元素的样式修复，因为它应已被移除。`);
+                        // 标记一下，以防有同class的元素
+                        correspondingClonedChild.dataset.styled = 'true';
+                        return;
+                    }
+                    // --- 新增逻辑结束 ---
+                    
+                    const cloneId = `child-${index}-${uuidv4().substring(0, 8)}`;
+                    
+                    // 4. 对找到的对应子元素应用样式
+                    copyComputedStyles(originalChild, correspondingClonedChild, cloneId);
+                    correspondingClonedChild.style.width = `${originalChild.offsetWidth}px`;
+                    correspondingClonedChild.style.height = `${originalChild.offsetHeight}px`;
+
+                    // 标记为已处理，防止在循环中被重复匹配
+                    correspondingClonedChild.dataset.styled = 'true';
+
+                    captureLogger.debug(`  > 已修复现有子元素: ${correspondingClonedChild.className}`);
+                } else {
+                     captureLogger.debug(`  > 在克隆体中未找到对应的子元素: ${originalChild.className}`);
                 }
-                // --- 新增逻辑结束 ---
-
-                const newClonedChild = originalChild.cloneNode(true);
-                const cloneId = `child-${index}-${childIndex}`;
-
-                copyComputedStyles(originalChild, newClonedChild, cloneId);
-                newClonedChild.style.width = `${originalChild.offsetWidth}px`;
-                newClonedChild.style.height = `${originalChild.offsetHeight}px`;
-
-                // 递归处理孙子元素，以确保所有层级的样式都被复制
-                // 注意：这里我们选择不递归，因为会变得非常复杂且性能开销大。
-                // 我们的方法已经能处理直接子元素的伪元素，通常已经足够。
-                // 如果需要更深层次的复制，应将更深的选择器也加入selectors数组。
-
-                clonedContainer.appendChild(newClonedChild);
-                captureLogger.debug(`  > 已重新创建并添加子元素: ${newClonedChild.className}`);
             });
+
+            // 清理标记
+            clonedContainer.querySelectorAll('[data-styled]').forEach(el => el.removeAttribute('data-styled'));
 
             captureLogger.success(`[布局修复] 已成功修复容器 "${selector}" 及其子元素的布局。`);
         });
