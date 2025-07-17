@@ -7,8 +7,8 @@ import {
 } from '../../../../script.js';
 
 // --- 插件元数据 ---
-const PLUGIN_ID = 'modern-screenshot';
-const PLUGIN_NAME = 'Modern Screenshot';
+const PLUGIN_ID = 'html2canvas-pro';
+const PLUGIN_NAME = 'html2canvas-pro';
 
 // --- 日志系统 ---
 const captureLogger = {
@@ -124,7 +124,7 @@ class AssetCacheManager {
         return transaction.objectStore(storeName);
     }
 
-    // --- 字体相关方法 (已有) ---
+    // --- 字体相关方法 ---
     async getAllFontData() {
         return new Promise((resolve, reject) => {
             const store = this._getStore(this.stores.fontData);
@@ -170,7 +170,7 @@ class AssetCacheManager {
         });
     }
 	
-    // --- NEW: 图片相关方法 ---
+    // --- 图片相关方法 ---
     async getAllImageData() {
         return new Promise((resolve, reject) => {
             const store = this._getStore(this.stores.imageData);
@@ -199,7 +199,7 @@ class AssetCacheManager {
     }
 
 
-	// MODIFIED: 修正后的 processFontFromStyleElement 函数，支持内联 @font-face
+	// 支持内联 @font-face
 	async processFontFromStyleElement() {
 		const styleElement = document.querySelector('#custom-style');
 		if (!styleElement) {
