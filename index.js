@@ -14,7 +14,7 @@ import {
 // --- 插件元数据 ---
 const PLUGIN_ID = 'html2canvas-pro';
 const PLUGIN_NAME = 'html2canvas-pro';
-const SCRIPT_VERSION = '2.1.0';
+const SCRIPT_VERSION = '3.0.0';
 
 // 日志系统
 const captureLogger = {
@@ -383,7 +383,7 @@ const initSettingsUI = () => {
 
         if ($(`#${OVERLAY_ID}`).length === 0) {
             const helpContentHtml = `
-                <h4>酒馆截图插件 v2.1.0 使用说明</h4>
+                <h4>酒馆截图插件 v3.0.0 使用说明</h4>
                 
                 <h5>✨ 主要更新内容</h5>
                 <h6>核心优化与修复</h6>
