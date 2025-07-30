@@ -72,7 +72,7 @@ function markUpdateNoticeSeen() {
 
 // 自动更新检查器
 const updateChecker = {
-    GITHUB_REPO: 'yuncengfeihou/modern-screenshot',
+    GITHUB_REPO: 'uhhhh15/html2canvas-pro',
     REMOTE_CHANGELOG_PATH: 'CHANGELOG.md',
     REMOTE_MANIFEST_PATH: 'manifest.json',
     remoteVersion: '0.0.0',
