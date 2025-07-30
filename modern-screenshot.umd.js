@@ -832,6 +832,11 @@
     style.forEach(([value, priority], name) => {
       clonedStyle.setProperty(name, value, priority);
     });
+    if (node.classList.contains("mes_block")) {
+      clonedStyle.setProperty("overflow", "visible", "important");
+      clonedStyle.setProperty("overflow-x", "visible", "important");
+      clonedStyle.setProperty("overflow-y", "visible", "important");
+    }
     return style;
   }
 
@@ -839,245 +844,6 @@
     if (isTextareaElement(node) || isInputElement(node) || isSelectElement(node)) {
       cloned.setAttribute("value", node.value);
     }
-  }
-
-  const pseudoClasses = [
-    ":before",
-    ":after"
-    // ':placeholder', TODO
-  ];
-  const scrollbarPseudoClasses = [
-    ":-webkit-scrollbar",
-    ":-webkit-scrollbar-button",
-    // ':-webkit-scrollbar:horizontal', TODO
-    ":-webkit-scrollbar-thumb",
-    ":-webkit-scrollbar-track",
-    ":-webkit-scrollbar-track-piece",
-    // ':-webkit-scrollbar:vertical', TODO
-    ":-webkit-scrollbar-corner",
-    ":-webkit-resizer"
-  ];
-  function copyPseudoClass(node, cloned, copyScrollbar, context, addWordToFontFamilies) {
-    const { ownerWindow, svgStyleElement, svgStyles, currentNodeStyle } = context;
-    if (!svgStyleElement || !ownerWindow)
-      return;
-    function copyBy(pseudoClass) {
-      const computedStyle = ownerWindow.getComputedStyle(node, pseudoClass);
-      let content = computedStyle.getPropertyValue("content");
-      if (!content || content === "none")
-        return;
-      addWordToFontFamilies?.(content);
-      content = content.replace(/(')|(")|(counter\(.+\))/g, "");
-      const klasses = [uuid()];
-      const defaultStyle = getDefaultStyle(node, pseudoClass, context);
-      currentNodeStyle?.forEach((_, key) => {
-        defaultStyle.delete(key);
-      });
-      const style = getDiffStyle(computedStyle, defaultStyle, context.includeStyleProperties);
-      style.delete("content");
-      style.delete("-webkit-locale");
-      if (style.get("background-clip")?.[0] === "text") {
-        cloned.classList.add("______background-clip--text");
-      }
-      const cloneStyle = [
-        `content: '${content}';`
-      ];
-      style.forEach(([value, priority], name) => {
-        cloneStyle.push(`${name}: ${value}${priority ? " !important" : ""};`);
-      });
-      if (cloneStyle.length === 1)
-        return;
-      try {
-        cloned.className = [cloned.className, ...klasses].join(" ");
-      } catch (err) {
-        context.log.warn("Failed to copyPseudoClass", err);
-        return;
-      }
-      const cssText = cloneStyle.join("\n  ");
-      let allClasses = svgStyles.get(cssText);
-      if (!allClasses) {
-        allClasses = [];
-        svgStyles.set(cssText, allClasses);
-      }
-      allClasses.push(`.${klasses[0]}:${pseudoClass}`);
-    }
-    pseudoClasses.forEach(copyBy);
-    if (copyScrollbar)
-      scrollbarPseudoClasses.forEach(copyBy);
-  }
-
-  const excludeParentNodes = /* @__PURE__ */ new Set([
-    "symbol"
-    // test/fixtures/svg.symbol.html
-  ]);
-  async function appendChildNode(node, cloned, child, context, addWordToFontFamilies) {
-    if (isElementNode(child) && (isStyleElement(child) || isScriptElement(child)))
-      return;
-    if (context.filter && !context.filter(child))
-      return;
-    if (excludeParentNodes.has(cloned.nodeName) || excludeParentNodes.has(child.nodeName)) {
-      context.currentParentNodeStyle = void 0;
-    } else {
-      context.currentParentNodeStyle = context.currentNodeStyle;
-    }
-    const childCloned = await cloneNode(child, context, false, addWordToFontFamilies);
-    cloned.appendChild(childCloned);
-  }
-  async function cloneChildNodes(node, cloned, context, addWordToFontFamilies) {
-    let firstChild = node.firstChild;
-    if (isElementNode(node)) {
-      if (node.shadowRoot) {
-        firstChild = node.shadowRoot?.firstChild;
-        context.shadowRoots.push(node.shadowRoot);
-      }
-    }
-    for (let child = firstChild; child; child = child.nextSibling) {
-      if (isCommentNode(child))
-        continue;
-      if (isElementNode(child) && isSlotElement(child) && typeof child.assignedNodes === "function") {
-        const nodes = child.assignedNodes();
-        for (let i = 0; i < nodes.length; i++) {
-          await appendChildNode(node, cloned, nodes[i], context, addWordToFontFamilies);
-        }
-      } else {
-        await appendChildNode(node, cloned, child, context, addWordToFontFamilies);
-      }
-    }
-  }
-  function applyCssStyleWithOptions(cloned, context) {
-    const { backgroundColor, width, height, style: styles } = context;
-    const clonedStyle = cloned.style;
-    if (backgroundColor)
-      clonedStyle.setProperty("background-color", backgroundColor, "important");
-    if (width)
-      clonedStyle.setProperty("width", `${width}px`, "important");
-    if (height)
-      clonedStyle.setProperty("height", `${height}px`, "important");
-    if (styles) {
-      for (const name in styles) clonedStyle[name] = styles[name];
-    }
-  }
-  const NORMAL_ATTRIBUTE_RE = /^[\w-:]+$/;
-  async function cloneNode(node, context, isRoot = false, addWordToFontFamilies) {
-    const { ownerDocument, ownerWindow, fontFamilies, onCloneEachNode } = context;
-    if (ownerDocument && isTextNode(node)) {
-      if (addWordToFontFamilies && /\S/.test(node.data)) {
-        addWordToFontFamilies(node.data);
-      }
-      return ownerDocument.createTextNode(node.data);
-    }
-    if (ownerDocument && ownerWindow && isElementNode(node) && (isHTMLElementNode(node) || isSVGElementNode(node))) {
-      const cloned2 = await cloneElement(node, context);
-      if (context.isEnable("removeAbnormalAttributes")) {
-        const names = cloned2.getAttributeNames();
-        for (let len = names.length, i = 0; i < len; i++) {
-          const name = names[i];
-          if (!NORMAL_ATTRIBUTE_RE.test(name)) {
-            cloned2.removeAttribute(name);
-          }
-        }
-      }
-      const style = context.currentNodeStyle = copyCssStyles(node, cloned2, isRoot, context);
-      if (isRoot)
-        applyCssStyleWithOptions(cloned2, context);
-      const needsScrollFix = context.isEnable("restoreScrollPosition") && isHTMLElementNode(node) && (node.scrollTop > 0 || node.scrollLeft > 0);
-      let copyScrollbar = false;
-      if (context.isEnable("copyScrollbar") && !needsScrollFix) {
-        const overflow = [
-          style.get("overflow-x")?.[0],
-          style.get("overflow-y")?.[0]
-        ];
-        copyScrollbar = overflow.includes("scroll") || (overflow.includes("auto") || overflow.includes("overlay")) && (node.scrollHeight > node.clientHeight || node.scrollWidth > node.clientWidth);
-      }
-      const textTransform = style.get("text-transform")?.[0];
-      const families = splitFontFamily(style.get("font-family")?.[0]);
-      const addWordToFontFamilies2 = families ? (word) => {
-        if (textTransform === "uppercase") {
-          word = word.toUpperCase();
-        } else if (textTransform === "lowercase") {
-          word = word.toLowerCase();
-        } else if (textTransform === "capitalize") {
-          word = word[0].toUpperCase() + word.substring(1);
-        }
-        families.forEach((family) => {
-          let fontFamily = fontFamilies.get(family);
-          if (!fontFamily) {
-            fontFamilies.set(family, fontFamily = /* @__PURE__ */ new Set());
-          }
-          word.split("").forEach((text) => fontFamily.add(text));
-        });
-      } : void 0;
-      const PSEUDO_ELEMENT_WHITELIST_SELECTOR = `
-            [class*="fa-"], 
-            input[type="checkbox"], 
-            summary,
-    		.ch_name
-        `;
-      if (node.matches(PSEUDO_ELEMENT_WHITELIST_SELECTOR)) {
-        copyPseudoClass(
-          node,
-          cloned2,
-          copyScrollbar,
-          context,
-          addWordToFontFamilies2
-        );
-      }
-      copyInputValue(node, cloned2);
-      if (!isVideoElement(node)) {
-        if (needsScrollFix) {
-          const wrapper = ownerDocument.createElement("div");
-          const { scrollTop, scrollLeft } = node;
-          wrapper.style.transform = `translate(${-scrollLeft}px, ${-scrollTop}px)`;
-          await cloneChildNodes(
-            node,
-            wrapper,
-            // 目标是 wrapper
-            context,
-            addWordToFontFamilies2
-          );
-          cloned2.appendChild(wrapper);
-          if (isHTMLElementNode(cloned2)) {
-            cloned2.style.overflow = "hidden";
-          }
-        } else {
-          await cloneChildNodes(
-            node,
-            cloned2,
-            context,
-            addWordToFontFamilies2
-          );
-        }
-      }
-      await onCloneEachNode?.(cloned2);
-      return cloned2;
-    }
-    const cloned = node.cloneNode(false);
-    await cloneChildNodes(node, cloned, context);
-    await onCloneEachNode?.(cloned);
-    return cloned;
-  }
-
-  function destroyContext(context) {
-    context.ownerDocument = void 0;
-    context.ownerWindow = void 0;
-    context.svgStyleElement = void 0;
-    context.svgDefsElement = void 0;
-    context.svgStyles.clear();
-    context.defaultComputedStyles.clear();
-    if (context.sandbox) {
-      try {
-        context.sandbox.remove();
-      } catch (err) {
-        context.log.warn("Failed to destroyContext", err);
-      }
-      context.sandbox = void 0;
-    }
-    context.workers = [];
-    context.fontFamilies.clear();
-    context.fontCssTexts.clear();
-    context.requests.clear();
-    context.tasks = [];
-    context.shadowRoots = [];
   }
 
   function baseFetch(options) {
@@ -1213,6 +979,224 @@
   function toRE(url) {
     const escaped = url.replace(/([.*+?^${}()|\[\]\/\\])/g, "\\$1");
     return new RegExp(`(url\\(['"]?)(${escaped})(['"]?\\))`, "g");
+  }
+
+  const pseudoClasses = [
+    ":before",
+    ":after"
+    // ':placeholder', TODO
+  ];
+  async function copyPseudoClass(node, cloned, copyScrollbar, context, addWordToFontFamilies) {
+    const { ownerWindow, svgStyleElement, svgStyles, currentNodeStyle } = context;
+    if (!svgStyleElement || !ownerWindow)
+      return;
+    async function copyBy(pseudoClass) {
+      const computedStyle = ownerWindow.getComputedStyle(node, pseudoClass);
+      const content = computedStyle.getPropertyValue("content");
+      const backgroundImage = computedStyle.getPropertyValue("background-image");
+      if (content === "none" && backgroundImage === "none") {
+        return;
+      }
+      if (content !== "none") {
+        addWordToFontFamilies?.(content);
+      }
+      const klasses = [uuid()];
+      const defaultStyle = getDefaultStyle(node, pseudoClass, context);
+      currentNodeStyle?.forEach((_, key) => {
+        defaultStyle.delete(key);
+      });
+      const style = getDiffStyle(computedStyle, defaultStyle, context.includeStyleProperties);
+      const bgImageKey = "background-image";
+      if (style.has(bgImageKey)) {
+        const [value, priority] = style.get(bgImageKey);
+        const newValue = await replaceCssUrlToDataUrl(value, null, context, true);
+        style.set(bgImageKey, [newValue, priority]);
+      }
+      const listImageKey = "list-style-image";
+      if (style.has(listImageKey)) {
+        const [value, priority] = style.get(listImageKey);
+        const newValue = await replaceCssUrlToDataUrl(value, null, context, true);
+        style.set(listImageKey, [newValue, priority]);
+      }
+      style.delete("-webkit-locale");
+      if (style.get("background-clip")?.[0] === "text") {
+        cloned.classList.add("______background-clip--text");
+      }
+      const cloneStyle = [];
+      if (content !== "none") {
+        const newContent = content.replace(/(')|(")|(counter\(.+\))/g, "");
+        cloneStyle.push(`content: '${newContent}';`);
+      }
+      style.forEach(([value, priority], name) => {
+        if (name.toLowerCase() !== "content") {
+          cloneStyle.push(`${name}: ${value}${priority ? " !important" : ""};`);
+        }
+      });
+      if (cloneStyle.length === 0)
+        return;
+      try {
+        cloned.className = [cloned.className, ...klasses].join(" ");
+      } catch (err) {
+        context.log.warn("Failed to copyPseudoClass", err);
+        return;
+      }
+      const cssText = cloneStyle.join("\n  ");
+      let allClasses = svgStyles.get(cssText);
+      if (!allClasses) {
+        allClasses = [];
+        svgStyles.set(cssText, allClasses);
+      }
+      allClasses.push(`.${klasses[0]}${pseudoClass}`);
+    }
+    await Promise.all(pseudoClasses.map((pc) => copyBy(pc)));
+  }
+
+  const excludeParentNodes = /* @__PURE__ */ new Set([
+    "symbol"
+    // test/fixtures/svg.symbol.html
+  ]);
+  async function appendChildNode(node, cloned, child, context, addWordToFontFamilies) {
+    if (isElementNode(child) && (isStyleElement(child) || isScriptElement(child)))
+      return;
+    if (context.filter && !context.filter(child))
+      return;
+    if (excludeParentNodes.has(cloned.nodeName) || excludeParentNodes.has(child.nodeName)) {
+      context.currentParentNodeStyle = void 0;
+    } else {
+      context.currentParentNodeStyle = context.currentNodeStyle;
+    }
+    const childCloned = await cloneNode(child, context, false, addWordToFontFamilies);
+    cloned.appendChild(childCloned);
+  }
+  async function cloneChildNodes(node, cloned, context, addWordToFontFamilies) {
+    let firstChild = node.firstChild;
+    if (isElementNode(node)) {
+      if (node.shadowRoot) {
+        firstChild = node.shadowRoot?.firstChild;
+        context.shadowRoots.push(node.shadowRoot);
+      }
+    }
+    for (let child = firstChild; child; child = child.nextSibling) {
+      if (isCommentNode(child))
+        continue;
+      if (isElementNode(child) && isSlotElement(child) && typeof child.assignedNodes === "function") {
+        const nodes = child.assignedNodes();
+        for (let i = 0; i < nodes.length; i++) {
+          await appendChildNode(node, cloned, nodes[i], context, addWordToFontFamilies);
+        }
+      } else {
+        await appendChildNode(node, cloned, child, context, addWordToFontFamilies);
+      }
+    }
+  }
+  function applyCssStyleWithOptions(cloned, context) {
+    const { backgroundColor, width, height, style: styles } = context;
+    const clonedStyle = cloned.style;
+    if (backgroundColor)
+      clonedStyle.setProperty("background-color", backgroundColor, "important");
+    if (width)
+      clonedStyle.setProperty("width", `${width}px`, "important");
+    if (height)
+      clonedStyle.setProperty("height", `${height}px`, "important");
+    if (styles) {
+      for (const name in styles) clonedStyle[name] = styles[name];
+    }
+  }
+  const NORMAL_ATTRIBUTE_RE = /^[\w-:]+$/;
+  async function cloneNode(node, context, isRoot = false, addWordToFontFamilies) {
+    const { ownerDocument, ownerWindow, fontFamilies, onCloneEachNode } = context;
+    if (ownerDocument && isTextNode(node)) {
+      if (addWordToFontFamilies && /\S/.test(node.data)) {
+        addWordToFontFamilies(node.data);
+      }
+      return ownerDocument.createTextNode(node.data);
+    }
+    if (ownerDocument && ownerWindow && isElementNode(node) && (isHTMLElementNode(node) || isSVGElementNode(node))) {
+      const cloned2 = await cloneElement(node, context);
+      if (context.isEnable("removeAbnormalAttributes")) {
+        const names = cloned2.getAttributeNames();
+        for (let len = names.length, i = 0; i < len; i++) {
+          const name = names[i];
+          if (!NORMAL_ATTRIBUTE_RE.test(name)) {
+            cloned2.removeAttribute(name);
+          }
+        }
+      }
+      const style = context.currentNodeStyle = copyCssStyles(node, cloned2, isRoot, context);
+      if (isRoot)
+        applyCssStyleWithOptions(cloned2, context);
+      let copyScrollbar = false;
+      if (context.isEnable("copyScrollbar")) {
+        const overflow = [
+          style.get("overflow-x")?.[0],
+          style.get("overflow-y")?.[0]
+        ];
+        copyScrollbar = overflow.includes("scroll") || (overflow.includes("auto") || overflow.includes("overlay")) && (node.scrollHeight > node.clientHeight || node.scrollWidth > node.clientWidth);
+      }
+      const textTransform = style.get("text-transform")?.[0];
+      const families = splitFontFamily(style.get("font-family")?.[0]);
+      const addWordToFontFamilies2 = families ? (word) => {
+        if (textTransform === "uppercase") {
+          word = word.toUpperCase();
+        } else if (textTransform === "lowercase") {
+          word = word.toLowerCase();
+        } else if (textTransform === "capitalize") {
+          word = word[0].toUpperCase() + word.substring(1);
+        }
+        families.forEach((family) => {
+          let fontFamily = fontFamilies.get(family);
+          if (!fontFamily) {
+            fontFamilies.set(family, fontFamily = /* @__PURE__ */ new Set());
+          }
+          word.split("").forEach((text) => fontFamily.add(text));
+        });
+      } : void 0;
+      await copyPseudoClass(
+        node,
+        cloned2,
+        copyScrollbar,
+        context,
+        addWordToFontFamilies2
+      );
+      copyInputValue(node, cloned2);
+      if (!isVideoElement(node)) {
+        await cloneChildNodes(
+          node,
+          cloned2,
+          context,
+          addWordToFontFamilies2
+        );
+      }
+      await onCloneEachNode?.(cloned2);
+      return cloned2;
+    }
+    const cloned = node.cloneNode(false);
+    await cloneChildNodes(node, cloned, context);
+    await onCloneEachNode?.(cloned);
+    return cloned;
+  }
+
+  function destroyContext(context) {
+    context.ownerDocument = void 0;
+    context.ownerWindow = void 0;
+    context.svgStyleElement = void 0;
+    context.svgDefsElement = void 0;
+    context.svgStyles.clear();
+    context.defaultComputedStyles.clear();
+    if (context.sandbox) {
+      try {
+        context.sandbox.remove();
+      } catch (err) {
+        context.log.warn("Failed to destroyContext", err);
+      }
+      context.sandbox = void 0;
+    }
+    context.workers = [];
+    context.fontFamilies.clear();
+    context.fontCssTexts.clear();
+    context.requests.clear();
+    context.tasks = [];
+    context.shadowRoots = [];
   }
 
   const properties = [
@@ -1531,22 +1515,33 @@
     await Promise.all([...Array.from({ length: 4 })].map(runTask));
     log.timeEnd("embed node");
     await onEmbedNode?.(clone);
-    const svg = createForeignObjectSvg(clone, context);
+    const svg = createForeignObjectSvgWithWrapper(clone, context);
     svgDefsElement && svg.insertBefore(svgDefsElement, svg.children[0]);
     svgStyleElement && svg.insertBefore(svgStyleElement, svg.children[0]);
     autoDestruct && destroyContext(context);
     await onCreateForeignObjectSvg?.(svg);
     return svg;
   }
-  function createForeignObjectSvg(clone, context) {
-    const { width, height } = context;
-    const svg = createSvg(width, height, clone.ownerDocument);
+  function createForeignObjectSvgWithWrapper(clone, context) {
+    const { width, height, ownerDocument } = context;
+    const svg = createSvg(width, height, ownerDocument);
     const foreignObject = svg.ownerDocument.createElementNS(svg.namespaceURI, "foreignObject");
     foreignObject.setAttributeNS(null, "x", "0%");
     foreignObject.setAttributeNS(null, "y", "0%");
     foreignObject.setAttributeNS(null, "width", "100%");
     foreignObject.setAttributeNS(null, "height", "100%");
-    foreignObject.append(clone);
+    const scrollbarHideStyle = svg.ownerDocument.createElementNS(svg.namespaceURI, "style");
+    scrollbarHideStyle.textContent = `
+    *::-webkit-scrollbar { display: none !important; }
+    * { scrollbar-width: none !important; }
+  `;
+    foreignObject.appendChild(scrollbarHideStyle);
+    const container = svg.ownerDocument.createElement("div");
+    container.style.position = "relative";
+    container.style.width = "100%";
+    container.style.height = "100%";
+    container.appendChild(clone);
+    foreignObject.appendChild(container);
     svg.appendChild(foreignObject);
     return svg;
   }
